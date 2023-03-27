@@ -6,12 +6,13 @@ where the genome will vary between related sequences? That is, between species, 
 gene / protein family. For example, are there particular genomic patterns that are more variable and / or conserved 
 than others?
 
+See [GERP_chr17_demo.ipynb](GERP_chr17_demo.ipynb) for a thorough explanation, including some informative graphs.
+
 ## Abstract
 Analyzing human chromosome 17, we extend the known inversion symmetry between occurence counts of reverse complement 
 k-mers of nucleotides to a measure  of a nucleotide's conservation across a multispecies alignment. 
 Namely, the [GERP score](http://mendel.stanford.edu/SidowLab/downloads/gerp/). This provides evidence that sequence 
-itself influences how different  it will be across species. See [GERP_chr17_demo.ipynb](GERP_chr17_demo.ipynb) for 
-details.
+itself influences how different  it will be across species. 
 
 It is important to emphasize that this is the result of a global analysis across coding regions in Chromosome 17. 
 So one cannot reasonably ascribe the observed differences to the selective advantage of a gene or group of genes. 
