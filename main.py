@@ -1,0 +1,31 @@
+"""
+Experimental research script to find patterns correlations between genomic variability / conservation and sequence
+or annotation information.
+Conservation score is measured by Genomic Evolutionary Rate Profiling (GERP).
+All data obtained from Ensembl release 109
+"""
+
+from data.load import read_sequence, read_annotation_generator, read_gerp_scorer
+from data.paths import chr17_paths  # paths to source data files
+from score_analysis import score_stats_by_kmer
+
+if __name__ == '__main__':
+    # start the analysis with human chromosome 17
+    paths = chr17_paths
+
+    # get the raw sequence dictionary, from a FASTA file
+    seq_dict = read_sequence(paths.sequence)
+
+    # # (optional) examine annotations, from the annotation GFF file
+    # examine_annotation(paths.annotation)
+
+    # get the annotated sequence generator function, from the annotation GFF file
+    seq_records_gen = read_annotation_generator(paths.annotation, seq_dict=seq_dict)
+
+    # get GERP retrieval function, from the BigWig file
+    gerp_scorer = read_gerp_scorer(paths.gerp)
+
+    # analyze by kmer for CDS (coding sequence) features
+    kmer_base_df = score_stats_by_kmer(seq_records_gen, gerp_scorer, ['CDS'], k_values=[1, 2, 3])
+
+
