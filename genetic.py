@@ -20,10 +20,13 @@ for codon, aa in CODON_FORWARD_TABLE.items():
     CODON_BACK_TABLE[aa].append(codon)
 CODON_BACK_TABLE = dict(CODON_BACK_TABLE)
 
+NUCLEOTIDE_ALPHABET = standard_dna_table.nucleotide_alphabet
+
 RESIDUE_COL = 'residue'
 
+
 # summary of key feature properties
-FeatureBrief = namedtuple('FeatureBrief', ['type', 'start', 'end', 'subfeatures'])
+FeatureBrief = namedtuple('FeatureBrief', ['seq_name', 'type', 'start', 'end', 'subfeatures'])
 
 
 def kmers_in_rc_order(k):
@@ -84,8 +87,9 @@ def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: lis
 
         if not feature_type_filter or feature.type in feature_type_filter:
             feature_ct += 1
-            filtered_feature = FeatureBrief(type=feature.type, start=feature.location.start.position,
-                                            end=feature.location.end.position, subfeatures=len(feature.sub_features))
+            filtered_feature = FeatureBrief(seq_name=seq_record.name, type=feature.type,
+                                            start=feature.location.start.position, end=feature.location.end.position,
+                                            subfeatures=len(feature.sub_features))
             filtered_features.append(filtered_feature)
 
     logging.info(f'Traversed feature tree in {iter_ct:,} iterations. Extracted {feature_ct:,} features.')

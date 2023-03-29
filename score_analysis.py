@@ -19,6 +19,8 @@ K_COL, KMER_COL, SEQNAME_COL, FRAME_COL, POS_COL = ID_COLS
 VALUE_COLS = ['count', 'score_mean', 'score_std']
 COUNT_COL, SCORE_MEAN_COL, SCORE_STD_COL = VALUE_COLS
 
+USE_SOFTMASKED = True  # flag to whether to use softmasked nucleotides, in small letters e.g. 'gatc'
+
 
 def score_stats_by_feature_type(seq_records_gen: Callable[[], Iterator[SeqRecord]],
                                 scorer: Callable[[str, int, int], list[float]]) -> pd.DataFrame:
@@ -40,7 +42,7 @@ def score_stats_by_feature_type(seq_records_gen: Callable[[], Iterator[SeqRecord
         feature_briefs = get_feature_briefs(seq_record)
         for i, ft in enumerate(feature_briefs):
             periodic_logging(i, f'Processing feature {i:,}.')
-            scores = scorer(seq_record.name, ft.start, ft.end)
+            scores = scorer(seq_name, ft.start, ft.end)
             s1 = sum(scores)
             s2 = sum([s**2 for s in scores])
 
@@ -98,18 +100,20 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
         for i, ft in enumerate(feature_briefs):
             periodic_logging(i, f'Processing feature {i:,}.')
 
-            sequence = seq_record.seq[ft.start: ft.end+1]
-            scores = scorer(seq_name, ft.start, ft.end + 1)
+            ft_sequence = str(seq_record.seq[ft.start: ft.end + 1])
+            if USE_SOFTMASKED:
+                ft_sequence = ft_sequence.upper()
+            ft_scores = scorer(seq_name, ft.start, ft.end + 1)
 
             for k in k_values:
 
-                # loop through the sequence and associated scores, in a window of width k, shifting by one nucleotide at
-                # a time, updating the current kmer, and values with each iteration
+                # loop through the feature sequence and associated scores, in a window of width k, shifting by one
+                # nucleotide at a time, updating the current kmer, and values with each iteration
                 cur_kmer = ''
                 cur_scores = []
-                for ind in range(len(sequence)):
-                    next_nucleotide = sequence[ind]
-                    next_score = scores[ind]
+                for ind in range(len(ft_sequence)):
+                    next_nucleotide = ft_sequence[ind]
+                    next_score = ft_scores[ind]
 
                     # skip k-mers that contain soft-masked lowercase nucleotides or undefined scores.
                     if next_nucleotide != next_nucleotide.upper() or np.isnan(next_score):
@@ -139,8 +143,7 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
 
     # compute score stats (mean, variance, count) per kmer
     kmer_base_df = kmer_df.groupby(ID_COLS, as_index=False).agg(
-        {COUNT_COL: ('score', 'count'), SCORE_MEAN_COL: ('score', 'mean'), SCORE_STD_COL: ('score', 'std')})
-            # count=('score', 'count'), score_mean=('score', 'mean'), score_std=('score', 'std'))
+        **{COUNT_COL: ('score', 'count'), SCORE_MEAN_COL: ('score', 'mean'), SCORE_STD_COL: ('score', 'std')})
 
     logging.info(f'Computed score stats by k-mer, on {len(kmer_base_df)} k-mers, for {feature_type_filter} feature types.')
 
@@ -155,9 +158,8 @@ def aggregate_over_position(df_in: pd.DataFrame):
     """
     groupby_cols = [col for col in df_in.columns if col in ID_COLS and col != POS_COL]
     df_agg = df_in.groupby(groupby_cols, as_index=False).agg(
-        {COUNT_COL: (COUNT_COL, 'first'), SCORE_MEAN_COL: (SCORE_MEAN_COL, 'mean'),
+        **{COUNT_COL: (COUNT_COL, 'first'), SCORE_MEAN_COL: (SCORE_MEAN_COL, 'mean'),
          SCORE_STD_COL: (SCORE_STD_COL, std_to_std_of_mean)})
-        # count=('count', 'first'), score_mean=('score_mean', 'mean'), score_std=('score_std', std_to_std_of_mean))
     return df_agg
 
 
@@ -175,16 +177,14 @@ def aggregate_over_additive_field(df_in: pd.DataFrame, additive_col: str):
 
     groupby_cols = [col for col in df_in.columns if col in ID_COLS and col != additive_col]
     df_agg = df_in.groupby(groupby_cols, as_index=False).agg(
-            {COUNT_COL: (COUNT_COL, 'sum'), SCORE_MEAN_COL: (SCORE_MEAN_COL, count_weighted_mean),
+            **{COUNT_COL: (COUNT_COL, 'sum'), SCORE_MEAN_COL: (SCORE_MEAN_COL, count_weighted_mean),
              SCORE_STD_COL: (SCORE_STD_COL, count_weighted_std)})
-    # count=('count', 'sum'), score_mean=('score_mean', count_weighted_mean),
-    #         score_std=('score_std', count_weighted_std))
     return df_agg
 
 
 def aggregate_over_frame(df_in: pd.DataFrame):
     """Aggregate over frame, which is an additive column field."""
-    return aggregate_over_additive_field(df_in, POS_COL)
+    return aggregate_over_additive_field(df_in, FRAME_COL)
 
 
 def aggregate_over_seq_name(df_in: pd.DataFrame):
