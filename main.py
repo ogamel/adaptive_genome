@@ -8,8 +8,9 @@ import logging
 
 from data.load import read_sequence, read_annotation_generator, read_gerp_scorer
 from data.paths import chr17_paths  # paths to source data files
+from data.process import get_train_test_x_y
 from score_analysis import score_stats_by_kmer
-from score_modeling import get_train_test_x_y, LocalWindowModel, ModelTrainer
+from score_modeling import LocalWindowModel, ModelTrainer
 
 if __name__ == '__main__':
     # start the analysis with human chromosome 17
