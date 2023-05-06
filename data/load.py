@@ -3,7 +3,8 @@ Module for loading data files into data structures or into generator functions t
 """
 
 from pprint import pprint
-from typing import Callable, Iterator
+from typing import Callable, Iterator, Tuple, Any, Dict
+import numpy as np
 
 import pyBigWig as bw
 from BCBio import GFF
@@ -42,9 +43,12 @@ def read_annotation_generator(gff_file: str, seq_dict: dict = None) -> Callable[
     return seq_records_gen
 
 
-def read_gerp_scorer(gerp_file: str) -> Callable[[str, int, int], list[float]]:
+def read_gerp_scorer(gerp_file: str) -> Callable[[str, int, int], np.array]:
     """
     Return the value function which itself returns GERP values from a given BigWig file.
     """
     gerp_bw = bw.open(gerp_file)
-    return gerp_bw.values
+
+    def scorer(seq: str, start: int, end:int):
+        return np.array(gerp_bw.values(seq, start, end))
+    return scorer

@@ -83,3 +83,18 @@ def stat_by_kmer_plot(df: pd.DataFrame, kmer_col: str = KMER_COL, count_col: str
 
         plt.savefig(f'{figs_path}/kmer_score_k={k}')
     return
+
+
+def plot_base_frequency(freq: dict):
+    """Plot the output of base_frequency."""
+
+    cum_prop = 0
+    x = None
+    for base, prop in freq.items():
+        if x is None:
+            x = np.arange(len(prop))
+        plt.fill_between(x, cum_prop, cum_prop+prop, label=base)
+        cum_prop += prop
+    plt.legend()
+
+    return

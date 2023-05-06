@@ -3,12 +3,15 @@ Important genetic functions and constants.
 """
 
 import logging
-from collections import defaultdict, namedtuple
+from util import periodic_logging
+import numpy as np
+from collections import defaultdict, namedtuple, Counter
 from itertools import product
 
 from Bio import SeqRecord
 from Bio.Data.CodonTable import standard_dna_table
-from Bio.Seq import reverse_complement
+from Bio.Seq import Seq, reverse_complement, complement
+import matplotlib.pyplot as plt
 
 # Build codon forward and back tables. Standard_dna_table.back_table lacks stop codons. We use None to represent stop.
 # Standard_dna_table.back_table contains only one codon per protein. Here we build one with all synonymous codons.
@@ -94,3 +97,56 @@ def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: lis
 
     logging.info(f'Traversed feature tree in {iter_ct:,} iterations. Extracted {feature_ct:,} features.')
     return filtered_features
+
+
+def base_frequency(seq: Seq, bucket=10000):
+    """
+    In a given sequence, create frequency of each occurring base in buckets.
+    """
+    bases = 'GATCNgatcn'
+    freqs = {b: np.empty(0) for b in bases}
+
+    for start in range(0, len(seq), bucket):
+        periodic_logging(start, f'Position {start}', v=bucket*100)
+        logging.info(f'Position {start}')
+        ctr = Counter(seq[start:start+bucket])
+        for b in bases:
+            freqs[b] = np.append(freqs[b], ctr[b]/bucket)
+
+    return freqs
+
+
+def find_symmetry_length_scale(seq: Seq, k=1, start=2*10**6, span=2000):
+    """
+    Find the length scale at which k-mers first become as frequent as their reverse complement.
+    """
+    # TODO: define a heurestic to infer the length scale from the data, and return it
+    seq_upper=seq.upper()
+
+    # get
+    kmers_set = {''.join(combo) for combo in product(NUCLEOTIDE_ALPHABET, repeat=k)}
+    kmer_pairs = []
+    while kmers_set:
+        kmer = kmers_set.pop()
+        kmer_rc = reverse_complement(kmer)
+        # kmer_rc = complement(kmer)
+        if kmer == kmer_rc:
+            continue
+        kmer_pairs.append((kmer, kmer_rc))
+        kmers_set.remove(kmer_rc)
+
+    x = np.arange(40, span, span//100)
+    proportion_diff = defaultdict(list)
+    for scale in x:
+        for kmer, kmer_rc in kmer_pairs:
+            proportion_diff[f'{kmer}-{kmer_rc}'].append((seq_upper[start:start+scale].count(kmer)
+                                                - seq_upper[start:start+scale].count(kmer_rc))/scale)
+
+    # TODO: Move plots to visuals.py
+    plt.figure()
+    for label, values in proportion_diff.items():
+        plt.plot(x, values, label=label)
+    plt.plot(x, 0*x, linestyle='dashed')
+    plt.legend()
+
+    return
