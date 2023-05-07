@@ -4,22 +4,27 @@ Statistical analysis functions for nucleotide scores, as a function of annotatio
 
 import logging
 import random
-from typing import Iterator, Callable
+from typing import Iterator, Callable, Iterable
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
 from Bio.Seq import reverse_complement
 from Bio.SeqRecord import SeqRecord
+from Bio.Data.CodonTable import standard_dna_table
 
 from genetic import get_feature_briefs, kmers_in_rc_order
 from util import periodic_logging, rd, std_to_std_of_mean
 
 ID_COLS = ['k', 'kmer', 'seq_name', 'frame', 'pos']
 K_COL, KMER_COL, SEQNAME_COL, FRAME_COL, POS_COL = ID_COLS
+DILATION_COL = 'dil'
+ID_COLS_GAP = [K_COL, KMER_COL, SEQNAME_COL, DILATION_COL, POS_COL]
 VALUE_COLS = ['count', 'score_mean', 'score_std']
 COUNT_COL, SCORE_MEAN_COL, SCORE_STD_COL = VALUE_COLS
 
 USE_SOFTMASKED = True  # flag to whether to use softmasked nucleotides, in small letters e.g. 'gatc'
+NUCLEOTIDES = set(standard_dna_table.nucleotide_alphabet)
 
 
 def score_stats_by_feature_type(seq_records_gen: Callable[[], Iterator[SeqRecord]],
@@ -78,20 +83,20 @@ def score_stats_by_feature_type(seq_records_gen: Callable[[], Iterator[SeqRecord
 
 
 def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
-                        scorer: Callable[[str, int, int], list[float]],  feature_type_filter: list[str],
-                        k_values: list[int] = None) -> pd.DataFrame:
+                        scorer: Callable[[str, int, int], np.array],  feature_type_filter: list[str],
+                        k_values: Iterable[int] = (2,)) -> pd.DataFrame:
     """
     Do basic analysis of score statistics by k-mer, only on sequences annotated by a feature type in feature_type_filter.
     score: function that takes seqname, start and end, returning score values for specified subsequence.
-    k_values list[int]: k values to analyze. Default is all k in the dataframe.
+    k_values list[int]: k values to analyze.
     """
 
     seq_records = seq_records_gen()
+    #
+    # if k_values is None:
+    #     k_values = [2]  # default value
 
-    if k_values is None:
-        k_values = [2]  # default value
-
-    kmer_data_rows = []
+    kmer_data = defaultdict(lambda: np.zeros(3))  # count, sum, sum of squares
     for seq_record in seq_records:
         seq_name = seq_record.name
         logging.info(f'Sequence {seq_name} ...')
@@ -100,7 +105,7 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
         for i, ft in enumerate(feature_briefs):
             periodic_logging(i, f'Processing feature {i:,}.')
 
-            ft_sequence = str(seq_record.seq[ft.start: ft.end + 1])
+            ft_sequence = seq_record.seq[ft.start: ft.end + 1]  # str
             if USE_SOFTMASKED:
                 ft_sequence = ft_sequence.upper()
             ft_scores = scorer(seq_name, ft.start, ft.end + 1)
@@ -128,25 +133,172 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
                             continue
 
                     frame = ind % k
+                    # track running count, sum, and sum of squares
                     for pos in range(k):
-                        kmer_data_rows.append(
-                            {
-                                K_COL: k,
-                                KMER_COL: cur_kmer,
-                                SEQNAME_COL: seq_name,
-                                FRAME_COL: frame,
-                                POS_COL: pos,
-                                'score': cur_scores[pos],
-                            })
+                        kmer_data[(k, cur_kmer, seq_name, frame, pos)] += [1, cur_scores[pos], cur_scores[pos] ** 2]
 
-    kmer_df = pd.DataFrame(kmer_data_rows)
+    # compute overall count, mean and standard deviation
+    kmer_data_agg = []
+    for key, sums in kmer_data.items():
+        k, cur_kmer, seq_name, frame, pos = key
+        s0, s1, s2 = sums
+        kmer_data_agg.append(
+            {
+                K_COL: k,
+                KMER_COL: cur_kmer,
+                SEQNAME_COL: seq_name,
+                FRAME_COL: frame,
+                POS_COL: pos,
+                COUNT_COL: int(s0),
+                SCORE_MEAN_COL: s1 / s0,
+                SCORE_STD_COL: np.sqrt(s2 / s0 - (s1 / s0) ** 2),
+            })
 
-    # compute score stats (mean, variance, count) per kmer
-    kmer_base_df = kmer_df.groupby(ID_COLS, as_index=False).agg(
-        **{COUNT_COL: ('score', 'count'), SCORE_MEAN_COL: ('score', 'mean'), SCORE_STD_COL: ('score', 'std')})
+    # create output DataFrame
+    kmer_base_df = pd.DataFrame(kmer_data_agg)
 
     logging.info(f'Computed score stats by k-mer, on {len(kmer_base_df)} k-mers, for {feature_type_filter} feature types.')
 
+    return kmer_base_df
+
+
+def score_stats_by_dilated_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
+                                scorer: Callable[[str, int, int], np.array], feature_type_filter: list[str],
+                                k_values: Iterable[int] = (2,), dilations=range(1, 25, 4)) -> pd.DataFrame:
+    """
+    Do basic analysis of score statistics by artificial gapped k-mer, with gaps between letters.
+    only on sequences annotated by a feature type in feature_type_filter.
+    score: function that takes seqname, start and end, returning score values for specified subsequence.
+    k_values Iterable[int]: k values to analyze.
+    """
+    # TODO: Combine this function score_stats_by_dilated_kmer with score_stats_by_dilated_kmer_whole
+
+    seq_records = seq_records_gen()
+
+    kmer_data = defaultdict(lambda: np.zeros(3))  # count, sum, sum of squares
+    for seq_record in seq_records:
+        seq_name = seq_record.name
+        logging.info(f'Sequence {seq_name} ...')
+
+        feature_briefs = get_feature_briefs(seq_record, feature_type_filter)
+        for i, ft in enumerate(feature_briefs):
+            periodic_logging(i, f'Processing feature {i:,}.', v=len(feature_briefs)//25)
+
+            ft_sequence = seq_record.seq[ft.start: ft.end + 1]
+            if USE_SOFTMASKED:
+                ft_sequence = ft_sequence.upper()
+            ft_scores = scorer(seq_name, ft.start, ft.end + 1)
+
+            for k in k_values:
+                for dilation in dilations:
+                    for ind in range(len(ft_sequence)-k*dilation):
+                        cur_kmer = ''.join([ft_sequence[j] for j in range(ind,ind+k*dilation,dilation)])
+                        cur_scores = ft_scores[ind:ind+k*dilation:dilation]
+
+                        if any(np.isnan(cur_scores)) or (set(cur_kmer) - NUCLEOTIDES):
+                            continue
+
+                        # track running count, sum, and sum of squares
+                        for pos in range(k):
+                            kmer_data[(k, cur_kmer, seq_name, dilation, pos)] += [1, cur_scores[pos], cur_scores[pos]**2]
+
+    # compute overall count, mean and standard deviation
+    kmer_data_agg = []
+    for key, sums in kmer_data.items():
+        k, cur_kmer, seq_name, dilation, pos = key
+        s0, s1, s2 = sums
+        kmer_data_agg.append(
+            {
+                K_COL: k,
+                KMER_COL: cur_kmer,
+                SEQNAME_COL: seq_name,
+                DILATION_COL: dilation,
+                POS_COL: pos,
+                COUNT_COL:  int(s0),
+                SCORE_MEAN_COL: s1/s0,
+                SCORE_STD_COL: np.sqrt(s2 / s0 - (s1 / s0) ** 2),
+            })
+
+    # create output DataFrame
+    kmer_base_df = pd.DataFrame(kmer_data_agg)
+
+    logging.info(f'Computed score stats by k-mer, on {len(kmer_base_df)} k-mers, for {feature_type_filter} feature types.')
+
+    print(kmer_base_df.to_string())
+    return kmer_base_df
+
+
+def score_stats_by_dilated_kmer_whole(seq_records_gen: Callable[[], Iterator[SeqRecord]],
+                                      scorer: Callable[[str, int, int], np.array],
+                                      k_values: Iterable[int] = (2,), dilations=range(1, 25, 4)) -> pd.DataFrame:
+    """
+    Do basic analysis of score statistics by artificial gapped k-mer, with gaps between letters.
+    on the whole sequence.
+    score: function that takes seqname, start and end, returning score values for specified subsequence.
+    k_values Iterable[int]: k values to analyze.
+    """
+    CHUNK_SIZE = 10**6
+
+    seq_records = seq_records_gen()
+
+    kmer_data = defaultdict(lambda: np.zeros(3))  # count, sum, sum of squares
+    for seq_record in seq_records:
+        seq_name = seq_record.name
+        logging.info(f'Sequence {seq_name} ...')
+
+        # split it to chunks, length 1M maybe
+        for start in range(len(seq_record)//2, len(seq_record), CHUNK_SIZE):
+            # require that it be part of standard alphabet, and have GERP defined.
+
+            logging.info(f'Processing chunk starting at {start:,}')
+            if start >= len(seq_record)//2 + 1 * CHUNK_SIZE:
+                break
+
+            end = min(start+CHUNK_SIZE, len(seq_record))
+            chunk_sequence = str(seq_record.seq[start: end])
+            if False and USE_SOFTMASKED:
+                chunk_sequence = chunk_sequence.upper()
+            chunk_scores = scorer(seq_name, start, end)
+
+            # TODO: Chunking means gaps spanning chunk borders are excluded. Adapt chunking to fix this.
+
+            for k in k_values:
+                for dilation in dilations:
+                    for ind in range(len(chunk_sequence) - k * dilation):
+                        cur_kmer = ''.join([chunk_sequence[j] for j in range(ind, ind + k * dilation, dilation)])
+                        cur_scores = chunk_scores[ind:ind + k * dilation:dilation]
+
+                        if any(np.isnan(cur_scores)) or (set(cur_kmer) - NUCLEOTIDES):
+                            continue
+
+                        # track running count, sum, and sum of squares
+                        for pos in range(k):
+                            kmer_data[(k, cur_kmer, seq_name, dilations, pos)] += [1, cur_scores[pos],
+                                                                                   cur_scores[pos] ** 2]
+
+    # compute overall count, mean and standard deviation
+    kmer_data_agg = []
+    for key, sums in kmer_data.items():
+        k, cur_kmer, seq_name, dilations, pos = key
+        s0, s1, s2 = sums
+        kmer_data_agg.append(
+            {
+                K_COL: k,
+                KMER_COL: cur_kmer,
+                SEQNAME_COL: seq_name,
+                DILATION_COL: dilations,
+                POS_COL: pos,
+                COUNT_COL: int(s0),
+                SCORE_MEAN_COL: s1 / s0,
+                SCORE_STD_COL: np.sqrt(s2 / s0 - (s1 / s0) ** 2),
+            })
+
+    # create output DataFrame
+    kmer_base_df = pd.DataFrame(kmer_data_agg)
+
+    logging.info(f'Computed score stats by k-mer, on {len(kmer_base_df)} k-mers, for the whole sequence.')
+
+    print(kmer_base_df.to_string())
     return kmer_base_df
 
 
