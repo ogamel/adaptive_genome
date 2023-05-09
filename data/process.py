@@ -1,4 +1,4 @@
-"""Module to process loaded data, to prepare it for modeling and analysis where necessary."""
+"""Module to process loaded data, to prepare it for nn and analysis where necessary."""
 
 import logging
 from functools import partial

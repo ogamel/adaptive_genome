@@ -1,5 +1,5 @@
 """
-Predictive machine learning modeling of GERP scores.
+Predictive machine learning nn of GERP scores.
 The goal is to predict GERP as a function of annotation features and the sequence.
 """
 
@@ -28,9 +28,11 @@ from jaxtyping import PyTree
 import equinox as eqx
 
 from jax.random import PRNGKey
-from data.process import DEFAULT_WINDOW
+from data.process import DEFAULT_WINDOW, DEFAULT_BP_WINDOW, N_BASES
+from nn.components import TransformerLayer
 
 HIDDEN_LAYERS = (2, DEFAULT_WINDOW//2)  # number and width of hidden layers
+
 LEARNING_RATE = 0.1
 SEED = 200  # TODO: put default seed in one place, now it is duplicated. actually put all common constants in one place
 MAX_EPOCHS = 100
@@ -40,18 +42,22 @@ class Model(eqx.Module):
     """Abstract bass class for models."""
     @abstractmethod
     def __init__(self, *args, **kwargs):
+        """Model initialization call."""
         pass
 
     @abstractmethod
     def __call__(self, x):
+        """Model inference call."""
         pass
 
     @abstractmethod
     def loss(self, x, y):
+        """Computing the loss for inference on feature x, with ground truth y."""
         pass
 
     @abstractmethod
     def update(self, x, y):
+        """Update the model parameter one step by training on features x with ground truth y."""
         pass
 
 
@@ -77,17 +83,21 @@ class ModelTrainer:
 
     def train(self, x, y):
         """Model training call, returns trained version of current model on input and output x and y."""
+        # TODO: compute and print r^2, how much of variation is explained by our model
 
         @eqx.filter_jit
         def step(model, opt_state, x, y):
+            # TODO change LocalWindowModel to whatever model class .. possibly model.__class__.loss
             loss_value, grads = eqx.filter_value_and_grad(LocalWindowModel.loss)(model, x, y)
             updates, opt_state = self.optim.update(grads, opt_state, model)
             model = eqx.apply_updates(model, updates)
             return model, opt_state, loss_value
 
+        var_y = jnp.var(y)
+
         for i in range(self.epochs):
             self.model, self.opt_state, loss_value = step(self.model, self.opt_state, x, y)
-            periodic_logging(i, f'Epoch {i:,}. Training loss: {loss_value:.4f}.', v=10)
+            periodic_logging(i, f'Epoch {i:,}. Training loss: {loss_value:.4f}. R^2: {1-loss_value/var_y}.', v=10)
 
         logging.info('Training complete.')
 
@@ -95,7 +105,8 @@ class ModelTrainer:
 
 
 class LocalWindowModel(Model):
-    """Basic fully connected neural network, applied to a sliding window around the nucleotide of interest."""
+    """Naive fully connected neural network, applied to a sliding window around the nucleotide of interest."""
+
     layers: list
     extra_bias: jax.Array
 
@@ -135,3 +146,63 @@ class LocalWindowModel(Model):
         # since jax.grad differentiates w.r.t. the first argument
         grads = jax.grad(LocalWindowModel.loss)(self, x, y)
         return jax.tree_util.tree_map(lambda m, g: m - LEARNING_RATE * g, self, grads)
+
+
+class LocalTransformerEncoderModel(Model):
+    """
+    Self Attention applied to same sliding window as LocalWindowModel.
+    Steps: Positional encoding, MultiHead Attention with residual, feedforward with residual
+    """
+
+    NUM_TRANSFORMER_LAYERS = 3
+    NUM_ATTENTION_HEADS = 3
+    DROPOUT_RATE = 0.1
+
+    position_embedder: eqx.nn.Embedding
+    layers: list[TransformerLayer]
+
+
+    def __init__(self, key=None, num_transformer_layers=NUM_TRANSFORMER_LAYERS, hidden_size=N_BASES,
+                 num_heads=NUM_ATTENTION_HEADS, dropout_rate=DROPOUT_RATE, attention_dropout_rate=DROPOUT_RATE):
+        if key is None:
+            key = PRNGKey(SEED)
+
+        keys = jax.random.split(key, num_transformer_layers + 1)
+        self.position_embedder = eqx.nn.Embedding(num_embeddings=DEFAULT_BP_WINDOW,
+                                                  embedding_size=N_BASES, key=keys[-1])
+
+        self.layers = [TransformerLayer(hidden_size, hidden_size, num_heads, dropout_rate,
+                                            attention_dropout_rate, keys[i]) for i in range(num_transformer_layers)]
+        self.layers += [eqx.nn.Linear(hidden_size, 1, key=keys[-1])]  # output layer
+
+    def __call__(self, x):
+        """Model inference call."""
+        rows, cols = self.position_embedder.num_embeddings, self.position_embedder.embedding_size
+        x = jnp.reshape(x, [rows, cols])
+
+        position_ids = jnp.arange(rows)
+        positions = self.position_embedder(position_ids)
+        x += positions
+
+        for layer in self.layers[:-1]:
+            x = layer(x)
+        return self.layers[-1](x)
+
+    def loss(self, x, y):
+        """Calculate model loss function value for given input and output."""
+        # TODO: consider a measure of error different from MSE, one more in tune with how GERP score is calculated
+        pred_y = jax.vmap(self)(x)
+        return jnp.nanmean((y - pred_y) ** 2)
+
+    @jax.jit
+    def update(self, x, y):
+        """
+        Basic model training call, returns single training step, unoptimized, updated version of current model
+        on input and output x and y. Preferable to use ModelTrainer.train(x, y).
+        """
+
+        # loss function is called with self (i.e. the model along with its parameters) as an explicit parameter,
+        # since jax.grad differentiates w.r.t. the first argument
+        grads = jax.grad(LocalTransformerEncoderModel.loss)(self, x, y)
+        return jax.tree_util.tree_map(lambda m, g: m - LEARNING_RATE * g, self, grads)
+

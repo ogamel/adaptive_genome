@@ -95,15 +95,7 @@ class TransformerLayer(eqx.Module):
     attention_block: AttentionBlock
     ff_block: FeedForwardBlock
 
-    def __init__(
-        self,
-        hidden_size: int,
-        intermediate_size: int,
-        num_heads: int,
-        dropout_rate: float,
-        attention_dropout_rate: float,
-        key: jax.random.PRNGKey,
-    ):
+    def __init__(self, hidden_size, intermediate_size, num_heads, dropout_rate, attention_dropout_rate, key):
         attention_key, ff_key = jax.random.split(key)
 
         self.attention_block = AttentionBlock(
