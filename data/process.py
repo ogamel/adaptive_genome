@@ -24,7 +24,7 @@ HIDDEN_LAYERS = (2, DEFAULT_WINDOW//2)  # number and width of hidden layers
 SEED = 200
 
 USE_SOFTMASKED = True  # flag to whether to use softmasked nucleotides, in small letters e.g. 'gatc'
-
+MAX_TRAIN_ROWS = 200000
 
 def sequence_to_one_hot_array(sequence: str):
     """
@@ -48,10 +48,10 @@ def sliding_window(in_array: jnp.array, window: int = DEFAULT_BP_WINDOW):
 
 
 def get_train_test_x_y(seq_records_gen: Callable[[], Iterator[SeqRecord]],
-                       scorer: Callable[[str, int, int], list[float]], feature_type_filter: list[str]):
+                       scorer: Callable[[str, int, int], list[float]], feature_type_filter: list[str],
+                       max_train_rows=MAX_TRAIN_ROWS):
     """Build neural network to predict score based on sequence. """
 
-    MAX_ROWS = 200000
     seq_records = seq_records_gen()
 
     x_train, y_train = x_test, y_test = jnp.empty((0,DEFAULT_WINDOW)), jnp.empty((0,1))
@@ -66,9 +66,9 @@ def get_train_test_x_y(seq_records_gen: Callable[[], Iterator[SeqRecord]],
                                                                      random_state=SEED)
 
         for i, ft in enumerate(feature_briefs):
-            periodic_logging(i, f'Processing feature {i:,}. x_train shape: {x_train.shape}', v=100)
+            periodic_logging(i, f'Processing feature {i:,}. x_train shape: {x_train.shape}', v=len(feature_briefs)//100)
 
-            if len(x_train) > MAX_ROWS:
+            if len(x_train) > max_train_rows:
                 break
             d = DEFAULT_BP_WINDOW//2
 
