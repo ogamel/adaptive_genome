@@ -343,6 +343,11 @@ def aggregate_over_seq_name(df_in: pd.DataFrame):
     """Aggregate over seq_name, which is an additive column field."""
     return aggregate_over_additive_field(df_in, SEQNAME_COL)
 
+# TODO: based on dilated stats, measure normalized mutual information (averaged over all base combinations) vs dilation
+#  ... which will provide length scale of nonlocality of k-mers ... degree of dependence between bases
+# https://math.stackexchange.com/questions/3553704/how-to-measure-the-independence-of-random-variables
+# def mutual_information(df_in: pd.DataFrame):
+#     pass
 
 def corrcoefs_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, count_col: str = COUNT_COL,
                              score_col: str = SCORE_MEAN_COL, k_values: list[int] = None):
