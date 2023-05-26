@@ -154,13 +154,15 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
     # create output DataFrame
     kmer_base_df = pd.DataFrame(kmer_data_agg)
 
-    logging.info(f'Computed score stats by k-mer, on {len(kmer_base_df)} k-mers, for {feature_type_filter} feature types.')
+    logging.info(f'Computed score stats by k-mer, on {len(kmer_base_df)} k-mer outputs, '
+                 f'for {feature_type_filter} feature types.')
 
     return kmer_base_df
 
 
 def score_stats_by_dilated_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
-                                scorer: Callable[[str, int, int], np.array], feature_type_filter: Optional[list[str]],
+                                scorer: Callable[[str, int, int], np.array],
+                                feature_type_filter: Optional[list[str]] = None,
                                 k_values: Iterable[int] = (2,), dilations=range(1, 25, 4), seed=200,
                                 num_chunks=10, chunk_size=10**5) -> pd.DataFrame:
     """
@@ -215,7 +217,11 @@ def score_stats_by_dilated_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord
             for i in range(1, num_chunks):
                 starts[i] = max(starts[i], starts[i-1] + chunk_size)
 
-            for start in starts:
+            logging.info(f'Created {num_chunks} random chunks, with the following starts: \n' +
+                         '  '.join([f'{s:,}' for s in starts]) + '.')
+
+            for i, start in enumerate(starts):
+                periodic_logging(i, f'Processing chunk {i}.', v=1)
                 chunk_sequence = seq_record.seq[start: start + chunk_size]
                 chunk_scores = scorer(seq_name, start, start + chunk_size)
 
@@ -240,8 +246,10 @@ def score_stats_by_dilated_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord
 
     # create output DataFrame
     kmer_base_df = pd.DataFrame(kmer_data_agg)
+    out_text = f' for {feature_type_filter} feature types.' if feature_type_filter else \
+        f' on {num_chunks} random seqeunce chunks of size {chunk_size:,} each.'
 
-    logging.info(f'Computed score stats by k-mer, on {len(kmer_base_df)} k-mers, for {feature_type_filter} feature types.')
+    logging.info(f'Computed score stats by k-mer, on {len(kmer_base_df)} k-mer outputs, {out_text}')
 
     print(kmer_base_df.to_string())
     return kmer_base_df
