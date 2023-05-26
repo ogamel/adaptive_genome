@@ -9,7 +9,7 @@ import logging
 from data.load import read_sequence, read_annotation_generator, read_gerp_scorer
 from data.paths import chr17_paths  # paths to source data files
 from data.process import get_train_test_x_y
-from score_analysis import score_stats_by_kmer, score_stats_by_dilated_kmer
+from score_analysis import score_stats_by_kmer, score_stats_by_dilated_kmer, sample_extreme_score_sequences
 from score_modeling import LocalWindowModel, ModelTrainer
 
 if __name__ == '__main__':
@@ -39,7 +39,10 @@ if __name__ == '__main__':
     # kmer_base_df = score_stats_by_dilated_kmer(seq_records_gen, gerp_scorer, ['gene'], k_values=(2,), dilations=range(1,4))
 
     # analyze by gapped kmer for samples from whole chromosome
-    kmer_base_df_whole = score_stats_by_dilated_kmer(seq_records_gen, gerp_scorer, k_values=(2,), dilations=range(1,21))
+    # kmer_base_df_whole = score_stats_by_dilated_kmer(seq_records_gen, gerp_scorer, k_values=(2,), dilations=range(1,21))
+
+    # get extreme samples
+    # low_samples, high_samples = sample_extreme_score_sequences(seq_records_gen, gerp_scorer, ['CDS'])
 
     # """Modeling (neural network in JAX)"""
     # x_train, y_train, x_test, y_test = get_train_test_x_y(seq_records_gen, gerp_scorer, ['CDS'])

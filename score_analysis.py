@@ -4,7 +4,7 @@ Statistical analysis functions for nucleotide scores, as a function of annotatio
 
 import logging
 import random
-from typing import Iterator, Callable, Iterable, Optional
+from typing import Iterator, Callable, Iterable, Optional, Tuple, List, Union, Any
 from collections import defaultdict
 
 import numpy as np
@@ -12,6 +12,7 @@ import pandas as pd
 from Bio.Seq import reverse_complement
 from Bio.SeqRecord import SeqRecord
 from Bio.Data.CodonTable import standard_dna_table
+from numpy import ndarray
 
 from genetic import get_feature_briefs, kmers_in_rc_order
 from util import periodic_logging, rd, std_to_std_of_mean
@@ -172,7 +173,6 @@ def score_stats_by_dilated_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord
     score: function that takes seqname, start and end, returning score values for specified subsequence.
     k_values Iterable[int]: k values to analyze.
     """
-    # TODO: Test the combination of score_stats_by_dilated_kmer with score_stats_by_dilated_kmer_whole here
 
     def update_kmer_data(kmer_data, sequence, scores):
         """Mutates kmer_data dictionary to add the information the input sequence."""
@@ -246,8 +246,8 @@ def score_stats_by_dilated_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord
 
     # create output DataFrame
     kmer_base_df = pd.DataFrame(kmer_data_agg)
-    out_text = f' for {feature_type_filter} feature types.' if feature_type_filter else \
-        f' on {num_chunks} random seqeunce chunks of size {chunk_size:,} each.'
+    out_text = f'for {feature_type_filter} feature types.' if feature_type_filter else \
+        f'on {num_chunks} random seqeunce chunks of size {chunk_size:,} each.'
 
     logging.info(f'Computed score stats by k-mer, on {len(kmer_base_df)} k-mer outputs, {out_text}')
 
@@ -375,38 +375,69 @@ def corrcoefs_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, coun
     return  # corr_count_score, corr_pairwise_count, corr_pairwise_score
 
 
-def sample_sequence_by_score(seq_records_gen: Callable[[], Iterator[SeqRecord]], feature_type_filter: list[str],
-                            score: Callable[[str, int, int], list[float]], k: int = 3) -> list[list[str, list[float]]]:
-    """Return sample sequences with high variation, along with its score, calculated mean on a k-mer."""
-    # TODO: reimplement sample sequence function
+def sample_extreme_score_sequences(seq_records_gen: Callable[[], Iterator[SeqRecord]],
+                                   scorer: Callable[[str, int, int], np.array],
+                                   feature_type_filter: list[str], k: int = 3, padding=6, num_samples=20) -> [dict,dict]:
+    """
+    Return sample sequences with extreme score, along with its score, calculated mean on a k-mer.
+    Padding on either side.
+    """
 
     seq_records = seq_records_gen()
 
-    samples = []
-    iter_ct, feature_ct = 0, 0
+    low = high = None  # thresholds to be calculated
+    low_samples, high_samples = {}, {}
+    initial_scores = []  # to get distribution, and sample based on it
     for seq_record in seq_records:
         seq_name = seq_record.name
 
-        feature_stack = seq_record.features.copy()
-        while feature_stack:
-            periodic_logging(iter_ct, f'{iter_ct} iterations, {feature_ct} features with accepted types, {len(samples)} samples.')
-            iter_ct += 1
+        feature_briefs = get_feature_briefs(seq_record, feature_type_filter)
+        for i, ft in enumerate(feature_briefs):
+            periodic_logging(i, f'Processing feature {i:,}.')
 
-            feature = feature_stack.pop()
-            feature_stack.extend(feature.sub_features)
+            ft_sequence = seq_record.seq[ft.start: ft.end + 1]  # str
+            if USE_SOFTMASKED:
+                ft_sequence = ft_sequence.upper()
+            ft_scores = scorer(seq_name, ft.start, ft.end + 1)
 
-            if feature.type in feature_type_filter:
-                feature_ct += 1
-                # loop through kmers in feature, find average score over all k positions for each kmer.
-                s, e = feature.location.start.position, feature.location.end.position
+            j = 0
+            while j < len(ft_scores):
+                j+=1
+                if len(low_samples) > num_samples and len(high_samples) > num_samples:
+                    break
+                kmer = ft_sequence[j: j + k]
+                kmer_scores = ft_scores[j: j + k]
+                if len(kmer_scores) > 0:
+                    score_val = np.nanmean(kmer_scores)
+                else:
+                    continue
 
-                for i in range(s, e):
-                    kmer = str(seq_record.seq[i: i + k])
-                    score_val = np.nanmean(score(seq_name, i, i + k))
-                    if not np.isnan(score_val) and kmer == kmer.upper():  # ignore soft masked kmers, small letters
+                if len(initial_scores) < 10000:
+                    initial_scores.append(score_val)
+                    continue
+                elif low is None or high is None:
+                    low, high = np.percentile(initial_scores, [0.1, 99.9])
+                    logging.info(f'Defined sampling low {low:0.2f} and high {high:0.2f}.')
 
-                        # probabilistically sample the sequence and its score when very variable
-                        if random.random() < 0.0001 and score_val < 0.2 :
-                            samples.append([str(seq_record.seq[i-9: i+12]),list(rd(score(seq_name, i-9, i+12)))])
+                if low <= score_val <= high:
+                    continue
 
-    return samples
+                # populate the lists
+                if not np.isnan(score_val) and kmer == kmer.upper():  # ignore soft masked kmers, small letters
+                    sample_seq_padded = str(seq_record.seq[ft.start + j - padding: ft.start + j + k + padding])
+                    sample_scores_padded = rd(scorer(seq_name, ft.start + j - padding, ft.start + j + k + padding))
+                    if score_val < low:
+                        # seq_name, position, sequence, scores
+                        low_samples[(seq_name, ft.start + j - padding, sample_seq_padded)] = sample_scores_padded
+                    elif score_val > high:
+                        high_samples[(seq_name, ft.start + j - padding, sample_seq_padded)] = sample_scores_padded
+                    j+=padding
+
+        if len(low_samples) > num_samples:
+            keys = random.sample(low_samples.keys(), num_samples)
+            low_samples = {key: low_samples[key] for key in keys}
+        if len(high_samples) > num_samples:
+            keys = random.sample(high_samples.keys(), num_samples)
+            high_samples = {key: high_samples[key] for key in keys}
+
+    return low_samples, high_samples
