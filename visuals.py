@@ -10,7 +10,7 @@ import pandas as pd
 from matplotlib import gridspec, colormaps
 
 from genetic import kmers_in_rc_order
-from score_analysis import K_COL, KMER_COL, COUNT_COL, SCORE_MEAN_COL, POS_COL
+from score_collation import K_COL, KMER_COL, COUNT_COL, SCORE_MEAN_COL, POS_COL
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 

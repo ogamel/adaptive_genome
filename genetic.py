@@ -37,6 +37,7 @@ def kmers_in_rc_order(k):
     Return all k-mers ordered such that reverse complements are adjacent with self-reverse complements at the beginning.
     """
     # TODO: define and return a canonical order of this, consistent and symmetric for any k
+    # Read: https://www.biorxiv.org/content/10.1101/2023.03.09.531845v1.full.pdf
     kmers_set = {''.join(combo) for combo in product(standard_dna_table.nucleotide_alphabet, repeat=k)}
     kmers_list = []
     while kmers_set:

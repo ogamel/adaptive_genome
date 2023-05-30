@@ -9,7 +9,7 @@ import logging
 from data.load import read_sequence, read_annotation_generator, read_gerp_scorer
 from data.paths import chr17_paths  # paths to source data files
 from data.process import get_train_test_x_y
-from score_analysis import score_stats_by_kmer, score_stats_by_dilated_kmer, sample_extreme_score_sequences
+from score_collation import score_stats_by_kmer, score_stats_by_dilated_kmer, sample_extreme_score_sequences
 from score_modeling import LocalWindowModel, ModelTrainer
 
 if __name__ == '__main__':
