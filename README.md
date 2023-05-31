@@ -6,7 +6,7 @@ where the genome will vary between related sequences? That is, between species, 
 gene / protein family. For example, are there particular genomic patterns that are more variable and / or conserved 
 than others?
 
-See [Chr17_demo.ipynb](Chr17_demo.ipynb) for a thorough explanation, including some informative graphs.
+See [Chr17_analysis_demo.ipynb](Chr17_analysis_demo.ipynb) for a thorough explanation, including some informative graphs.
 
 ## Abstract
 Analyzing human chromosome 17, we extend the known inversion symmetry between occurence counts of reverse complement 

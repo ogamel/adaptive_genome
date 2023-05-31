@@ -50,7 +50,7 @@ def sliding_window(in_array: jnp.array, window: int = DEFAULT_BP_WINDOW):
 def get_train_test_x_y(seq_records_gen: Callable[[], Iterator[SeqRecord]],
                        scorer: Callable[[str, int, int], list[float]], feature_type_filter: list[str],
                        max_train_rows=MAX_TRAIN_ROWS):
-    """Build neural network to predict score based on sequence. """
+    """Build data to be fed into neural network to predict score based on sequence. NaNs are ignored."""
 
     seq_records = seq_records_gen()
 
@@ -72,23 +72,23 @@ def get_train_test_x_y(seq_records_gen: Callable[[], Iterator[SeqRecord]],
                 break
             d = DEFAULT_BP_WINDOW//2
 
-            ft_len = ft.end - ft.start + 1
             # expand sequence range by half the local window on either side
             ft_sequence = str(seq_record.seq[ft.start - d: ft.end + 1 + d])
             if USE_SOFTMASKED:
                 ft_sequence = ft_sequence.upper()
                 # TODO: update code below so that if USE_SOFTMASKED is False, small letters are ignored without dropping
                 #  the entire feature. Unclear how to do this efficiently in a window function though.
-            ft_scores = scorer(seq_name, ft.start, ft.end + 1)
 
-            # print(ft_sequence)
+            ft_scores = jnp.array(scorer(seq_name, ft.start, ft.end + 1))
+            nan_indices = jnp.isnan(ft_scores)
+
             ft_x = sliding_window(sequence_to_one_hot_array(ft_sequence))
-
-            ft_scores_array = jnp.array(ft_scores).reshape((ft_len, 1))
-            # TODO: consider a better way to deal with nan than imputation of the mean
-            ft_y = jnp.nan_to_num(ft_scores_array, nan=jnp.nanmean(ft_scores_array))
+            ft_x = ft_x[~nan_indices, :]
+            ft_y = ft_scores[~nan_indices].reshape((-1, 1))
 
             assert len(ft_x) == len(ft_y)
+            if len(ft_y) == 0:
+                continue
 
             if i in train_indices:
                 # append to train

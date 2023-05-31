@@ -76,7 +76,8 @@ def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: lis
     with optional filter to specific feature types.
     """
 
-    filtered_features = []
+    filtered_features_dict = defaultdict(list)
+    # feature_indices = []
     iter_ct, feature_ct = 0, 0
 
     logging.info('Traversing feature tree ...')
@@ -89,15 +90,43 @@ def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: lis
         feature = feature_stack.pop()
         feature_stack.extend(feature.sub_features)
 
+
         if not feature_type_filter or feature.type in feature_type_filter:
             feature_ct += 1
+            # feature_indices.append((feature.location.start.position, feature.location.end.position)
             filtered_feature = FeatureBrief(seq_name=seq_record.name, type=feature.type,
                                             start=feature.location.start.position, end=feature.location.end.position,
                                             subfeatures=len(feature.sub_features))
-            filtered_features.append(filtered_feature)
+            filtered_features_dict[feature.type].append(filtered_feature)
 
-    logging.info(f'Traversed feature tree in {iter_ct:,} iterations. Extracted {feature_ct:,} features.')
-    return filtered_features
+    filtered_features_dict = {ft_type: sorted(list(set(ft_list))) for ft_type, ft_list in filtered_features_dict.items()}
+
+    merged_features = []
+    filtered_ct = 0
+    for ft_type, ft_list in filtered_features_dict.items():
+        # merge overlapping features
+        ft_merged_list = []
+        merged_start, merged_end, merged_subfeatures = ft_list[0].start, ft_list[0].end, ft_list[0].subfeatures
+        for ft in ft_list[1:]:
+            if ft.start > merged_end + 1:  # non adjacent range
+                merged_feature = FeatureBrief(seq_name=seq_record.name, type=ft_type, start=merged_start,
+                                              end=merged_end, subfeatures=merged_subfeatures)
+                ft_merged_list.append(merged_feature)
+                merged_start, merged_end, merged_subfeatures = ft.start, ft.end, ft.subfeatures
+            else:
+                merged_end = ft.end
+                merged_subfeatures += ft.subfeatures
+        # final feature
+        merged_feature = FeatureBrief(seq_name=seq_record.name, type=ft_type, start=merged_start,
+                                      end=merged_end, subfeatures=merged_subfeatures)
+        ft_merged_list.append(merged_feature)
+
+        filtered_ct += len(ft_list)
+        merged_features.extend(ft_merged_list)
+
+    logging.info(f'Traversed feature tree in {iter_ct:,} iterations. \n\t\tExtracted {filtered_ct:,} unique features.'
+                 f'\n\t\tMerged to {len(merged_features):,} non-overlapping features.')
+    return merged_features
 
 
 def base_frequency(seq: Seq, bucket=10000):
