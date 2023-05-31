@@ -45,7 +45,7 @@ def score_stats_by_feature_type(seq_records_gen: Callable[[], Iterator[SeqRecord
 
         feature_briefs = get_feature_briefs(seq_record)
         for i, ft in enumerate(feature_briefs):
-            periodic_logging(i, f'Processing feature {i:,}.')
+            periodic_logging(i, f'Processing feature {i:,}.', v=len(feature_briefs)//10)
             scores = scorer(seq_name, ft.start, ft.end)
             s1 = sum(scores)
             s2 = sum([s**2 for s in scores])
@@ -99,7 +99,7 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
 
         feature_briefs = get_feature_briefs(seq_record, feature_type_filter)
         for i, ft in enumerate(feature_briefs):
-            periodic_logging(i, f'Processing feature {i:,}.')
+            periodic_logging(i, f'Processing feature {i:,}.', v=len(feature_briefs)//10)
 
             ft_sequence = seq_record.seq[ft.start: ft.end + 1]  # str
             if USE_SOFTMASKED:
@@ -198,7 +198,7 @@ def score_stats_by_dilated_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord
         if feature_type_filter:
             feature_briefs = get_feature_briefs(seq_record, feature_type_filter)
             for i, ft in enumerate(feature_briefs):
-                periodic_logging(i, f'Processing feature {i:,}.', v=len(feature_briefs)//25)
+                periodic_logging(i, f'Processing feature {i:,}.', v=len(feature_briefs)//10)
 
                 ft_sequence = seq_record.seq[ft.start: ft.end + 1]
                 if USE_SOFTMASKED:
@@ -313,7 +313,7 @@ def sample_extreme_score_sequences(seq_records_gen: Callable[[], Iterator[SeqRec
 
         feature_briefs = get_feature_briefs(seq_record, feature_type_filter)
         for i, ft in enumerate(feature_briefs):
-            periodic_logging(i, f'Processing feature {i:,}.')
+            periodic_logging(i, f'Processing feature {i:,}.', v=len(feature_briefs)//10)
 
             ft_sequence = seq_record.seq[ft.start: ft.end + 1]  # str
             if USE_SOFTMASKED:

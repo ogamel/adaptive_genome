@@ -1,5 +1,5 @@
 """
-Predictive machine learning nn of GERP scores.
+Predictive machine learning of GERP scores using neural networks.
 The goal is to predict GERP as a function of annotation features and the sequence.
 """
 

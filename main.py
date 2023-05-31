@@ -10,7 +10,8 @@ from data.load import read_sequence, read_annotation_generator, read_gerp_scorer
 from data.paths import chr17_paths  # paths to source data files
 from data.process import get_train_test_x_y
 from score_collation import score_stats_by_kmer, score_stats_by_dilated_kmer, sample_extreme_score_sequences
-from score_modeling import LocalWindowModel, ModelTrainer
+from score_nn_modeling import LocalWindowModel, ModelTrainer
+from genetic import get_feature_briefs
 
 if __name__ == '__main__':
     # start the analysis with human chromosome 17
@@ -27,6 +28,7 @@ if __name__ == '__main__':
 
     # get GERP retrieval function, from the BigWig file
     gerp_scorer = read_gerp_scorer(paths.gerp)
+
 
     """Analysis"""
     # # analyze by kmer for CDS (coding sequence) features
