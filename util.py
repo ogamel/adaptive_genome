@@ -3,11 +3,9 @@ Utility functions module.
 """
 
 import logging
-
 import numpy as np
 
 logging.basicConfig(level=logging.INFO)
-
 # formatter = logging.Formatter('\033[1A\x1b[2K%(message)s')
 
 

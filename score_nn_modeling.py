@@ -55,6 +55,10 @@ class Model(eqx.Module):
         """Computing the loss for inference on feature x, with ground truth y."""
         pass
 
+    def score(self, x, y):
+        """R^2 score, based on loss() function above, which is assumed to be mean square error."""
+        return 1-self.loss(x, y)/jnp.var(y)
+
     @abstractmethod
     def update(self, x, y):
         """Update the model parameter one step by training on features x with ground truth y."""
@@ -113,7 +117,9 @@ class LocalWindowModel(Model):
         if key is None:
             key = PRNGKey(SEED)
 
+        # wh is always even (since 4 members of alphabet), though the number of bases in the window can be odd
         nh, wh = hidden_layers
+
         keys = jax.random.split(key, nh + 2)
         self.layers = [eqx.nn.Linear(window, wh, key=keys[0])]  # input layer
         self.layers += [eqx.nn.Linear(wh, wh, key=keys[i+1]) for i in range(nh)]  # hidden layers
@@ -144,6 +150,60 @@ class LocalWindowModel(Model):
         # loss function is called with self (i.e. the model along with its parameters) as an explicit parameter,
         # since jax.grad differentiates w.r.t. the first argument
         grads = jax.grad(LocalWindowModel.loss)(self, x, y)
+        return jax.tree_util.tree_map(lambda m, g: m - LEARNING_RATE * g, self, grads)
+
+
+class SymmetricLocalWindowModel(Model):
+    """
+    Fully connected neural network, symmetric in inputs, applied to a sliding window around the nucleotide of interest.
+    Symmetry combined with one hot encoding of 'GATC' amounts to hardocding the euivalence of reverse complement scores.
+    This is since G--> [1 0 0 0] and its complement C--> [0 0 0 1] has the reverse vector. Same with A and T.
+    Hidden layer size is also halved, due to the lower number of independent variables.
+    TODO: revisit halving hte hidden layer size.
+    """
+
+    layers: list[eqx.nn.Linear]
+    extra_bias: jax.Array
+
+    def __init__(self, key=None, window=DEFAULT_WINDOW, hidden_layers=HIDDEN_LAYERS):
+        if key is None:
+            key = PRNGKey(SEED)
+
+        nh, wh = hidden_layers
+
+        keys = jax.random.split(key, nh + 2)
+        self.layers = [eqx.nn.Linear(window//2, wh, key=keys[0])]  # input layer
+        self.layers += [eqx.nn.Linear(wh, wh, key=keys[i+1]) for i in range(nh)]  # hidden layers
+        self.layers += [eqx.nn.Linear(wh, 1, key=keys[-1])]  # output layer
+
+        # trainable extra bias
+        self.extra_bias = jnp.ones(1)
+
+    def __call__(self, x):
+        """Model inference call."""
+        half_l = len(x)//2
+        layer = self.layers[0]
+        x = jax.nn.relu(layer(x[:half_l]) + layer(x[:half_l-1:-1]))
+        for layer in self.layers[1:-1]:
+            x = jax.nn.relu(layer(x))
+        return self.layers[-1](x) + self.extra_bias
+
+    def loss(self, x, y):
+        """Calculate model loss function value for given input and output."""
+        # TODO: consider a measure of error different from MSE, one more in tune with how GERP score is calculated
+        pred_y = jax.vmap(self)(x)
+        return jnp.nanmean((y - pred_y) ** 2)
+
+    @jax.jit
+    def update(self, x, y):
+        """
+        Basic model training call, returns single training step, unoptimized, updated version of current model
+        on input and output x and y. Preferable to use ModelTrainer.train(x, y).
+        """
+
+        # loss function is called with self (i.e. the model along with its parameters) as an explicit parameter,
+        # since jax.grad differentiates w.r.t. the first argument
+        grads = jax.grad(SymmetricLocalWindowModel.loss)(self, x, y)
         return jax.tree_util.tree_map(lambda m, g: m - LEARNING_RATE * g, self, grads)
 
 

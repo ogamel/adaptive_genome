@@ -18,6 +18,9 @@ from functools import partial
 from data.load import read_gerp_scorer
 from sklearn.model_selection import train_test_split
 from abc import ABC, abstractmethod
+from xgboost.sklearn import XGBRegressor
+
+
 
 from data.process import DEFAULT_WINDOW, DEFAULT_BP_WINDOW, N_BASES
 
@@ -27,3 +30,5 @@ LEARNING_RATE = 0.1
 SEED = 200  # TODO: put default seed in one place, now it is duplicated. actually put all common constants in one place
 MAX_EPOCHS = 100
 
+regressor = XGBRegressor()
+regressor.fit()

@@ -162,7 +162,7 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
 def score_stats_by_dilated_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
                                 scorer: Callable[[str, int, int], np.array],
                                 feature_type_filter: Optional[list[str]] = None,
-                                k_values: Iterable[int] = (2,), dilations=range(1, 25, 4), seed=200,
+                                k_values: Iterable[int] = (2,), strides=range(1, 25, 4), seed=200,
                                 num_chunks=10, chunk_size=10**5) -> pd.DataFrame:
     """
     Do basic analysis of score statistics by artificial gapped k-mer, with gaps between letters.
@@ -175,17 +175,17 @@ def score_stats_by_dilated_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord
     def update_kmer_data(kmer_data, sequence, scores):
         """Mutates kmer_data dictionary to add the information the input sequence."""
         for k in k_values:
-            for dilation in dilations:
-                for ind in range(len(sequence) - k * dilation):
-                    cur_kmer = ''.join([sequence[j] for j in range(ind, ind + k * dilation, dilation)])
-                    cur_scores = scores[ind:ind + k * dilation:dilation]
+            for stride in strides:
+                for ind in range(len(sequence) - k * stride):
+                    cur_kmer = ''.join([sequence[j] for j in range(ind, ind + k * stride, stride)])
+                    cur_scores = scores[ind:ind + k * stride:stride]
 
                     if any(np.isnan(cur_scores)) or (set(cur_kmer) - NUCLEOTIDES):
                         continue
 
                     # track running count, sum, and sum of squares
                     for pos in range(k):
-                        kmer_data[(k, cur_kmer, seq_name, dilation, pos)] += [1, cur_scores[pos], cur_scores[pos] ** 2]
+                        kmer_data[(k, cur_kmer, seq_name, stride, pos)] += [1, cur_scores[pos], cur_scores[pos] ** 2]
         return
 
     seq_records = seq_records_gen()

@@ -35,13 +35,13 @@ if __name__ == '__main__':
     # kmer_base_df = score_stats_by_kmer(seq_records_gen, gerp_scorer, ['CDS'], k_values=[1, 2, 3])
 
     # analyze by dilated kmer for CDS (coding sequence) features
-    # kmer_base_df = score_stats_by_dilated_kmer(seq_records_gen, gerp_scorer, ['CDS'], k_values=(2,), dilations=range(1,4))
+    # kmer_base_df = score_stats_by_dilated_kmer(seq_records_gen, gerp_scorer, ['CDS'], k_values=(2,), strides=range(1,4))
 
     # analyze by dilated kmer for genes features
-    # kmer_base_df = score_stats_by_dilated_kmer(seq_records_gen, gerp_scorer, ['gene'], k_values=(2,), dilations=range(1,4))
+    # kmer_base_df = score_stats_by_dilated_kmer(seq_records_gen, gerp_scorer, ['gene'], k_values=(2,), strides=range(1,4))
 
     # analyze by gapped kmer for samples from whole chromosome
-    # kmer_base_df_whole = score_stats_by_dilated_kmer(seq_records_gen, gerp_scorer, k_values=(2,), dilations=range(1,21))
+    # kmer_base_df_whole = score_stats_by_dilated_kmer(seq_records_gen, gerp_scorer, k_values=(2,), strides=range(1,21))
 
     # get extreme samples
     # low_samples, high_samples = sample_extreme_score_sequences(seq_records_gen, gerp_scorer, ['CDS'])
