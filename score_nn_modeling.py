@@ -67,6 +67,7 @@ class Model(eqx.Module):
 
 class ModelTrainer:
     """Class that wraps a model with its training parameters, optimizer."""
+    # TODO: make it so model is modified in place as the trainer updates it.
     model: Model
     learning_rate: float
     epochs: int
@@ -93,6 +94,7 @@ class ModelTrainer:
         def step(model, opt_state, x, y):
             loss_value, grads = eqx.filter_value_and_grad(model.__class__.loss)(model, x, y)
             updates, opt_state = self.optim.update(grads, opt_state, model)
+            # TODO: This line needs to change model in place
             model = eqx.apply_updates(model, updates)
             return model, opt_state, loss_value
 
