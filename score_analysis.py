@@ -86,5 +86,10 @@ def corrcoefs_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, coun
 # TODO: based on dilated stats, measure normalized mutual information (averaged over all base combinations) vs dilation
 #  ... which will provide length scale of nonlocality of k-mers ... degree of dependence between bases
 # https://math.stackexchange.com/questions/3553704/how-to-measure-the-independence-of-random-variables
+# https://pdfs.semanticscholar.org/7914/8020ef42aff36f0649bccc94c9711f9b884f.pdf
 # def mutual_information(df_in: pd.DataFrame):
 #     pass
+
+
+# TODO: compute mutual information of k-mer vs its subwords ... e.g. P(ACC) vs P(A)P(C)P(C) vs P(AC)P(C) vs P(A)P(CC)
+# seems this needs deep thought and defining new quantities to truly understand it

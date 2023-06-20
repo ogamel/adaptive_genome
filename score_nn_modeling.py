@@ -161,7 +161,7 @@ class SymmetricLocalWindowModel(Model):
     Symmetry combined with one hot encoding of 'GATC' amounts to hardocding the euivalence of reverse complement scores.
     This is since G--> [1 0 0 0] and its complement C--> [0 0 0 1] has the reverse vector. Same with A and T.
     Hidden layer size is also halved, due to the lower number of independent variables.
-    TODO: revisit halving hte hidden layer size.
+    TODO: revisit halving the hidden layer size.
     """
 
     layers: list[eqx.nn.Linear]
