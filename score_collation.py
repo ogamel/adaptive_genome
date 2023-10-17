@@ -186,6 +186,9 @@ def score_stats_by_dilated_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord
                     # track running count, sum, and sum of squares
                     for pos in range(k):
                         kmer_data[(k, cur_kmer, seq_name, dilation, pos)] += [1, cur_scores[pos], cur_scores[pos] ** 2]
+
+                if k ==1:
+                    break
         return
 
     seq_records = seq_records_gen()

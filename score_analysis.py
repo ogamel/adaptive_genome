@@ -9,7 +9,6 @@ from Bio.Seq import reverse_complement
 from genetic import kmers_in_rc_order
 from score_collation import KMER_COL, COUNT_COL, SCORE_MEAN_COL, K_COL, ID_COLS, POS_COL
 
-
 def corrcoefs_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, count_col: str = COUNT_COL,
                              score_col: str = SCORE_MEAN_COL, k_values: list[int] = None):
     """
@@ -85,10 +84,43 @@ def corrcoefs_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, coun
 
 # TODO: based on dilated stats, measure normalized mutual information (averaged over all base combinations) vs dilation
 #  ... which will provide length scale of nonlocality of k-mers ... degree of dependence between bases
+# TODO: check before the sum, in case it is high for particular combinations... ...
+# check for different sequence types
 # https://math.stackexchange.com/questions/3553704/how-to-measure-the-independence-of-random-variables
+# https://en.wikipedia.org/wiki/Pointwise_mutual_information
 # https://pdfs.semanticscholar.org/7914/8020ef42aff36f0649bccc94c9711f9b884f.pdf
-# def mutual_information(df_in: pd.DataFrame):
-#     pass
+def mutual_information(df_in: pd.DataFrame):
+    # P(a)P(b) and P(a,b) for a given dilation
+    # assume input has single probabilities, i.e. k=1 and k=2
+
+    # for count
+
+    # get mono-nucleotide probabilities
+    df1 = df_in[(df_in.k==1)].copy()
+    df1['prob'] = df1['count'] / df1['count'].sum()
+    single_prob = dict(zip(df1.kmer, df1.prob))
+
+    # get dilated base pair probabilities
+    df_out = pd.DataFrame(columns=['dil', 'I', 'I_norm'])
+    for dil in df_in.dil.unique():
+        df2 = df_in[(df_in.dil==dil) & (df_in.k==2) & (df_in.pos==0)].copy()
+        df2['prob'] = df2['count'] / df2['count'].sum()
+        df2['prob_pos0'] = df2.kmer.str[0].map(single_prob)
+        df2['prob_pos1'] = df2.kmer.str[1].map(single_prob)
+
+        # compute normalized mutual information
+        I = (df2.prob*np.log(df2.prob/(df2.prob_pos0 * df2.prob_pos1))).sum()
+        I_norm = I / (- df1.prob * np.log(df1.prob)).sum()
+
+        df_out.loc[len(df_out)] = [dil, I, I_norm]
+
+    df_out.dil = df_out.dil.astype(int)
+
+    return df_out
+
+
+
+
 
 
 # TODO: compute mutual information of k-mer vs its subwords ... e.g. P(ACC) vs P(A)P(C)P(C) vs P(AC)P(C) vs P(A)P(CC)

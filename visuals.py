@@ -98,3 +98,15 @@ def plot_base_frequency(freq: dict):
     plt.legend()
 
     return
+
+
+def plot_mutual_information(df: pd.DataFrame):
+    """Output of mutual information function."""
+
+    plt.plot(df.dil, df.I)
+    plt.plot(df.dil, df.I_norm)
+    plt.ylim(bottom=0)
+    plt.xlim(left=1)
+    plt.show()
+
+    return
