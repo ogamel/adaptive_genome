@@ -2,16 +2,21 @@
 Experimental research script to find patterns correlations between genomic variability / conservation and sequence
 or annotation information.
 Conservation score is measured by Genomic Evolutionary Rate Profiling (GERP).
-All data obtained from Ensembl release 109
+All data obtained from Ensembl release 109.
 """
 import logging
+from importlib import reload
+import visuals
+visuals=reload(visuals)
+import score_analysis
+score_analysis = reload(score_analysis)
 
 from data.load import read_sequence, read_annotation_generator, read_gerp_scorer
 from data.paths import chr17_paths  # paths to source data files
 from data.process import get_train_test_x_y
 from score_collation import score_stats_by_kmer, score_stats_by_dilated_kmer, sample_extreme_score_sequences
 from score_nn_modeling import LocalWindowModel, ModelTrainer
-from score_analysis import mutual_information
+from score_analysis import mutual_information_by_dilation
 from visuals import plot_mutual_information
 from genetic import get_feature_briefs
 
@@ -41,15 +46,20 @@ if __name__ == '__main__':
     # kmer_base_df = score_stats_by_kmer(seq_records_gen, gerp_scorer, ['CDS'], k_values=[1, 2, 3])
 
     # analyze by dilated kmer for CDS (coding sequence) features
-    # kmer_base_df = score_stats_by_dilated_kmer(seq_records_gen, gerp_scorer, ['CDS'], k_values=(2,), dilations=range(1,4))
+    kmer_base_df_cds = score_stats_by_dilated_kmer(seq_records_gen, gerp_scorer, ['CDS'], k_values=(1, 2,), dilations=range(1,20))
+    df_out_cds, df2 = mutual_information_by_dilation(kmer_base_df_cds)
+    plot_mutual_information(df_out_cds, title_prefix='cds')
 
     # analyze by dilated kmer for genes features
-    # kmer_base_df = score_stats_by_dilated_kmer(seq_records_gen, gerp_scorer, ['gene'], k_values=(2,), dilations=range(1,4))
+    kmer_base_df_gene = score_stats_by_dilated_kmer(seq_records_gen, gerp_scorer, ['gene'], k_values=(1, 2,), dilations=range(1,20))
+    df_out_gene = mutual_information_by_dilation(kmer_base_df_gene)
+    plot_mutual_information(df_out_gene, title_prefix='gene')
 
-    # analyze by gapped kmer for samples from whole chromosome
+    # analyze by dilated kmer for samples from whole chromosome
     kmer_base_df_whole = score_stats_by_dilated_kmer(seq_records_gen, gerp_scorer, k_values=(1, 2,), dilations=range(1,20))
-    df_out = mutual_information(kmer_base_df_whole)
-    plot_mutual_information(df_out)
+    df_out_whole = mutual_information_by_dilation(kmer_base_df_whole)
+    plot_mutual_information(df_out_whole, title_prefix='whole_genome')
+
 
     # get extreme samples
     # low_samples, high_samples = sample_extreme_score_sequences(seq_records_gen, gerp_scorer, ['CDS'])
