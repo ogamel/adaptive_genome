@@ -145,6 +145,10 @@ def mutual_information_by_dilation(df_in: pd.DataFrame, do_triple:bool = False) 
 
 # TODO: compute mutual information of k-mer vs its subwords ... e.g. P(ACC) vs P(A)P(C)P(C) vs P(AC)P(C) vs P(A)P(CC)
 # seems this needs deep thought and defining new quantities to truly understand it
+# compare only with the level below it.
 
 # TODO: compute mutual information on codon level, of a codon being followed by others (64 x 64) ... or by Amino Acid
 #  level
+
+# TODO: check amino acid network ... i.e. reverse complement leads to another AA? but that is on opposite strand.
+#  May be look at sum of frequency of all codons that make same AA. actually, does RC imply anything about relative frequency of AA? I don't think anything simple 

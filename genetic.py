@@ -3,7 +3,7 @@ Important genetic functions and constants.
 """
 
 import logging
-from util import periodic_logging
+from util import periodic_logging, rd
 import numpy as np
 from collections import defaultdict, namedtuple, Counter
 from itertools import product
@@ -24,7 +24,6 @@ for codon, aa in CODON_FORWARD_TABLE.items():
 CODON_BACK_TABLE = dict(CODON_BACK_TABLE)
 
 NUCLEOTIDE_ALPHABET = standard_dna_table.nucleotide_alphabet
-
 RESIDUE_COL = 'residue'
 
 
@@ -67,6 +66,24 @@ def transcribe_residues(df, codon_col, residue_col=RESIDUE_COL, inplace=False):
     df_out = df_out.reindex(columns=cols)
 
     return df_out
+
+
+def code_frequencies(backtable=CODON_BACK_TABLE):
+    """
+    Return frequency dictionary.
+    Output dict: key = number of codons, value = number of amino acids represented with this number of codons.
+    """
+    return dict(Counter([len(codon_list) for codon_list in backtable.values()]))
+
+
+def code_frequency_proportions(backtable=CODON_BACK_TABLE):
+    """
+    Return proportion dictionary.
+    Output dict: key = number of codons, value = proportion of amino acids represented with this number of codons.
+    """
+    freq_dict = code_frequencies(backtable)
+    v_sum = sum(freq_dict.values())
+    return {k: rd(v/v_sum) for k, v in freq_dict.items()}
 
 
 def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: list[str] = None) \

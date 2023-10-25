@@ -37,3 +37,6 @@ chr17_paths = ProjectPaths(
     annotation = f'{PROJ_PATH}/data/human_genome/ensembl/gffs/Homo_sapiens.GRCh38.109.chromosome.17.gff3',
     gerp = f'{PROJ_PATH}/data/gerp/gerp_conservation_scores.homo_sapiens.GRCh38.bw'
 )
+
+# Artificial genome
+english_genome_dir = f'{PROJ_PATH}/data/english_text/'

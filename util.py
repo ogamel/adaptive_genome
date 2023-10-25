@@ -36,3 +36,4 @@ def std_to_std_of_mean(std_array, weights=None):
         weights = np.ones(len(std_array))
     weights = weights / np.sum(weights)
     return np.sqrt(np.sum(np.square(np.multiply(std_array, weights))))
+
