@@ -196,7 +196,7 @@ def artificial_stats_by_kmer(back_table, file_dir=english_genome_dir, codon_choi
 
     # create output DataFrame
     kmer_base_df = pd.DataFrame(kmer_data_agg)
-    kmer_base_df.sort_values(by=['k','kmer','frame'])
+    kmer_base_df = kmer_base_df.sort_values(by=['k','kmer','frame'])
 
     logging.info(f'Computed artificial genome score stats by k-mer, on {len(kmer_base_df)} k-mer outputs, '
                  f'for files in {file_dir}.')

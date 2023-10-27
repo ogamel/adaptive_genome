@@ -28,7 +28,7 @@ RESIDUE_COL = 'residue'
 
 
 # summary of key feature properties
-FeatureBrief = namedtuple('FeatureBrief', ['seq_name', 'type', 'start', 'end', 'subfeatures'])
+FeatureBrief = namedtuple('FeatureBrief', ['seq_name', 'type', 'start', 'end', 'strand', 'phase', 'subfeatures'])
 
 
 def kmers_in_rc_order(k):
@@ -86,11 +86,16 @@ def code_frequency_proportions(backtable=CODON_BACK_TABLE):
     return {k: rd(v/v_sum) for k, v in freq_dict.items()}
 
 
-def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: list[str] = None) \
+def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: list[str] = None,
+                       merge_overlapping_features: bool = True, merge_opposite_strands: bool = False) \
         -> list[FeatureBrief]:
     """
     In a given SeqRecord, traverse feature subfeature tree, and return a list of all feature ranges,
     with optional filter to specific feature types.
+    merge_overlapping_features: If true, merge overlapping features.
+    merge_opposite_strands: If true merge opposing strands and set strand = 0,
+        if false keep them separate, despite the overlap. An analysis of Chr17 shows such cases are only 0.17% of the
+        genome.
     """
 
     filtered_features_dict = defaultdict(list)
@@ -107,35 +112,56 @@ def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: lis
         feature = feature_stack.pop()
         feature_stack.extend(feature.sub_features)
 
-
         if not feature_type_filter or feature.type in feature_type_filter:
             feature_ct += 1
-            # feature_indices.append((feature.location.start.position, feature.location.end.position)
+            phase = int(feature.qualifiers['phase'][0]) if 'phase' in feature.qualifiers else None
             filtered_feature = FeatureBrief(seq_name=seq_record.name, type=feature.type,
                                             start=feature.location.start.position, end=feature.location.end.position,
+                                            strand=feature.strand, phase=phase,
                                             subfeatures=len(feature.sub_features))
             filtered_features_dict[feature.type].append(filtered_feature)
 
     filtered_features_dict = {ft_type: sorted(list(set(ft_list))) for ft_type, ft_list in filtered_features_dict.items()}
 
+    # merge overlapping features on the same strand
+
     merged_features = []
     filtered_ct = 0
     for ft_type, ft_list in filtered_features_dict.items():
-        # merge overlapping features
         ft_merged_list = []
         merged_start, merged_end, merged_subfeatures = ft_list[0].start, ft_list[0].end, ft_list[0].subfeatures
+        merged_strand, merged_phase = ft_list[0].strand, ft_list[0].phase
         for ft in ft_list[1:]:
-            if ft.start > merged_end + 1:  # non adjacent range
+            if (not merge_overlapping_features) or ft.start > merged_end + 1 or \
+                    (not merge_opposite_strands and ft.strand != merged_strand):  # do not merge
+                # Three cases not to merge:
+                # 1. merge_overlapping_features is False.
+                # 2. Features don't overlap.
+                # 3. Features overlap from opposite strands and merge_opposite_strands is False
+
                 merged_feature = FeatureBrief(seq_name=seq_record.name, type=ft_type, start=merged_start,
-                                              end=merged_end, subfeatures=merged_subfeatures)
-                ft_merged_list.append(merged_feature)
+                                              end=merged_end, strand=merged_strand, phase=merged_phase,
+                                              subfeatures=merged_subfeatures)
+                ft_merged_list.append(merged_feature)  # append previous feature
                 merged_start, merged_end, merged_subfeatures = ft.start, ft.end, ft.subfeatures
-            else:
+                merged_strand, merged_phase = ft.strand, ft.phase
+            else:  # adjacent or overlapping feature
+                # merged_start is that of the first feature
                 merged_end = ft.end
                 merged_subfeatures += ft.subfeatures
+                if ft.strand == merged_strand:  # adjacent or overlapping feature with same strand
+                    # merged_strand is that of the first feature
+                    # merged_phase is of the first feature for +1 strand, last feature for -1 strand
+                    if merged_strand == -1:
+                        merged_phase = ft.phase
+                else:  # adjacent or overlapping feature with opposite strand
+                    # to get here, merge_opposite_strands must be True
+                    merged_phase = -1  # phase becomes meaningless
+                    merged_strand = 0  # strand meaningless
+
         # final feature
-        merged_feature = FeatureBrief(seq_name=seq_record.name, type=ft_type, start=merged_start,
-                                      end=merged_end, subfeatures=merged_subfeatures)
+        merged_feature = FeatureBrief(seq_name=seq_record.name, type=ft_type, start=merged_start, end=merged_end,
+                                      strand=merged_strand, phase=merged_phase, subfeatures=merged_subfeatures)
         ft_merged_list.append(merged_feature)
 
         filtered_ct += len(ft_list)

@@ -43,22 +43,22 @@ if __name__ == '__main__':
 
     """Analysis"""
     # # analyze by kmer for CDS (coding sequence) features
-    # kmer_base_df = score_stats_by_kmer(seq_records_gen, gerp_scorer, ['CDS'], k_values=[1, 2, 3])
+    kmer_base_df = score_stats_by_kmer(seq_records_gen, gerp_scorer, ['CDS'], k_values=[1, 2, 3])
 
-    # analyze by dilated kmer for CDS (coding sequence) features
-    kmer_base_df_cds = score_stats_by_dilated_kmer(seq_records_gen, gerp_scorer, ['CDS'], k_values=(1, 2,), dilations=range(1,20))
-    df_out_cds, df2 = mutual_information_by_dilation(kmer_base_df_cds)
-    plot_mutual_information(df_out_cds, title_prefix='cds')
-
-    # analyze by dilated kmer for genes features
-    kmer_base_df_gene = score_stats_by_dilated_kmer(seq_records_gen, gerp_scorer, ['gene'], k_values=(1, 2,), dilations=range(1,20))
-    df_out_gene = mutual_information_by_dilation(kmer_base_df_gene)
-    plot_mutual_information(df_out_gene, title_prefix='gene')
-
-    # analyze by dilated kmer for samples from whole chromosome
-    kmer_base_df_whole = score_stats_by_dilated_kmer(seq_records_gen, gerp_scorer, k_values=(1, 2,), dilations=range(1,20))
-    df_out_whole = mutual_information_by_dilation(kmer_base_df_whole)
-    plot_mutual_information(df_out_whole, title_prefix='whole_genome')
+    # # analyze by dilated kmer for CDS (coding sequence) features
+    # kmer_base_df_cds = score_stats_by_dilated_kmer(seq_records_gen, gerp_scorer, ['CDS'], k_values=(1, 2,), dilations=range(1,20))
+    # df_out_cds, df2 = mutual_information_by_dilation(kmer_base_df_cds)
+    # plot_mutual_information(df_out_cds, title_prefix='cds')
+    #
+    # # analyze by dilated kmer for genes features
+    # kmer_base_df_gene = score_stats_by_dilated_kmer(seq_records_gen, gerp_scorer, ['gene'], k_values=(1, 2,), dilations=range(1,20))
+    # df_out_gene = mutual_information_by_dilation(kmer_base_df_gene)
+    # plot_mutual_information(df_out_gene, title_prefix='gene')
+    #
+    # # analyze by dilated kmer for samples from whole chromosome
+    # kmer_base_df_whole = score_stats_by_dilated_kmer(seq_records_gen, gerp_scorer, k_values=(1, 2,), dilations=range(1,20))
+    # df_out_whole = mutual_information_by_dilation(kmer_base_df_whole)
+    # plot_mutual_information(df_out_whole, title_prefix='whole_genome')
 
 
     # get extreme samples

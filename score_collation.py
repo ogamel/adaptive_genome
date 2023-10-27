@@ -15,8 +15,8 @@ from Bio.Data.CodonTable import standard_dna_table
 from genetic import get_feature_briefs
 from util import periodic_logging, rd, std_to_std_of_mean
 
-ID_COLS = ['k', 'kmer', 'seq_name', 'frame', 'pos']
-K_COL, KMER_COL, SEQNAME_COL, FRAME_COL, POS_COL = ID_COLS
+ID_COLS = ['k', 'kmer', 'seq_name', 'strand', 'phase', 'frame', 'pos']
+K_COL, KMER_COL, SEQNAME_COL, STRAND_COL, PHASE_COL, FRAME_COL, POS_COL = ID_COLS
 DILATION_COL = 'dil'
 ID_COLS_GAP = [K_COL, KMER_COL, SEQNAME_COL, DILATION_COL, POS_COL]
 VALUE_COLS = ['count', 'score_mean', 'score_std']
@@ -129,21 +129,25 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
                             continue
 
                     frame = ind % k
+                    frame3 = ind % 3
                     # track running count, sum, and sum of squares
                     for pos in range(k):
-                        kmer_data[(k, cur_kmer, seq_name, frame, pos)] += [1, cur_scores[pos], cur_scores[pos] ** 2]
+                        kmer_data[(k, cur_kmer, seq_name, ft.strand, ft.phase, frame, frame3, pos)] += [1, cur_scores[pos], cur_scores[pos] ** 2]
 
     # compute overall count, mean and standard deviation
     kmer_data_agg = []
     for key, sums in kmer_data.items():
-        k, cur_kmer, seq_name, frame, pos = key
+        k, cur_kmer, seq_name, strand, phase, frame, frame3, pos = key
         s0, s1, s2 = sums
         kmer_data_agg.append(
             {
                 K_COL: k,
                 KMER_COL: cur_kmer,
                 SEQNAME_COL: seq_name,
+                STRAND_COL: strand,
+                PHASE_COL: phase,
                 FRAME_COL: frame,
+                FRAME_COL + '3': frame3,
                 POS_COL: pos,
                 COUNT_COL: int(s0),
                 SCORE_MEAN_COL: s1 / s0,
@@ -152,6 +156,8 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
 
     # create output DataFrame
     kmer_base_df = pd.DataFrame(kmer_data_agg)
+    kmer_base_df = kmer_base_df.sort_values(by=[K_COL, KMER_COL, SEQNAME_COL, STRAND_COL, PHASE_COL, FRAME_COL,
+                                                FRAME_COL + '3', PHASE_COL]).reset_index(drop=True)
 
     logging.info(f'Computed score stats by k-mer, on {len(kmer_base_df)} k-mer outputs, '
                  f'for {feature_type_filter} feature types.')
