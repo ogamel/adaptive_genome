@@ -4,7 +4,7 @@ Module for aggregation of nucleotide scores, as a function of annotation feature
 
 import logging
 import random
-from typing import Iterator, Callable, Iterable, Optional
+from typing import Iterator, Callable, Iterable, Optional, Union, List
 from collections import defaultdict
 
 import numpy as np
@@ -15,8 +15,8 @@ from Bio.Data.CodonTable import standard_dna_table
 from genetic import get_feature_briefs
 from util import periodic_logging, rd, std_to_std_of_mean
 
-ID_COLS = ['k', 'kmer', 'seq_name', 'strand', 'phase', 'frame', 'pos']
-K_COL, KMER_COL, SEQNAME_COL, STRAND_COL, PHASE_COL, FRAME_COL, POS_COL = ID_COLS
+ID_COLS = ['k', 'kmer', 'seq_name', 'strand', 'phase', 'ft_len', 'frame', 'pos']
+K_COL, KMER_COL, SEQNAME_COL, STRAND_COL, PHASE_COL, FTLEN_COL, FRAME_COL, POS_COL = ID_COLS
 DILATION_COL = 'dil'
 ID_COLS_GAP = [K_COL, KMER_COL, SEQNAME_COL, DILATION_COL, POS_COL]
 VALUE_COLS = ['count', 'score_mean', 'score_std']
@@ -98,14 +98,27 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
         logging.info(f'Sequence {seq_name} ...')
 
         feature_briefs = get_feature_briefs(seq_record, feature_type_filter)
+        # temp_len_list = []
         for i, ft in enumerate(feature_briefs):
             periodic_logging(i, f'Processing feature {i:,}.', v=len(feature_briefs)//10)
 
-            ft_sequence = seq_record.seq[ft.start: ft.end + 1]  # str
+            # # choose start and end such that chosen sequence is multiple of 3 and
+            # if ft.phase is None:
+            #     start, end = ft.start, ft.end
+            # else:
+            #     if ft.strand == 1:
+            #         start = ft.start + ft.phase
+            #     else:  # ft.strand == -1
+            #         start =
+            start, end = ft.start, ft.end
+
+            ft_sequence = seq_record.seq[start: end + 1]  # str
             if USE_SOFTMASKED:
                 ft_sequence = ft_sequence.upper()
-            ft_scores = scorer(seq_name, ft.start, ft.end + 1)
+            ft_scores = scorer(seq_name, start, end + 1)
+            ft_len = len(ft_sequence) % 3
 
+            # temp_len_list.append({'len%3': len(ft_sequence) % 3, 'phase': ft.phase, 'strand': ft.strand})
             for k in k_values:
 
                 # loop through the feature sequence and associated scores, in a window of width k, shifting by one
@@ -128,16 +141,28 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
                         if len(cur_kmer) < k:
                             continue
 
-                    frame = ind % k
-                    frame3 = ind % 3
+                    frame = (ind - (k-1)) % 3
+
+                    # # ind just index the last nucleotide in the kmer.
+                    # if ft.strand == 1:
+                    #     frame = (ind - (k-1) + ft.phase) % 3
+                    # else:  # ft.strand == -1
+                    #     frame = (ind - (k-1) - (len(ft_sequence) - ft.phase)) % 3
+                    #     # entry len(ft_sequence) - ft.phase has frame 0 on the + strand
+
+                    # # Instead, we calculate kmer_ind, which is the
+                    # # index of the first nucleotide in a sense strand, or last nucleotide in an anti-sense strand
+                    # kmer_ind = ind - (k-1) if ft.strand == 1 else len(ft_sequence) - ind - 1
+                    # frame = (kmer_ind + ft.phase) % 3
+
                     # track running count, sum, and sum of squares
                     for pos in range(k):
-                        kmer_data[(k, cur_kmer, seq_name, ft.strand, ft.phase, frame, frame3, pos)] += [1, cur_scores[pos], cur_scores[pos] ** 2]
+                        kmer_data[(k, cur_kmer, seq_name, ft.strand, ft.phase, ft_len, frame, pos)] += [1, cur_scores[pos], cur_scores[pos] ** 2]
 
     # compute overall count, mean and standard deviation
     kmer_data_agg = []
     for key, sums in kmer_data.items():
-        k, cur_kmer, seq_name, strand, phase, frame, frame3, pos = key
+        k, cur_kmer, seq_name, strand, phase, ft_len, frame, pos = key
         s0, s1, s2 = sums
         kmer_data_agg.append(
             {
@@ -146,8 +171,8 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
                 SEQNAME_COL: seq_name,
                 STRAND_COL: strand,
                 PHASE_COL: phase,
+                FTLEN_COL: ft_len,
                 FRAME_COL: frame,
-                FRAME_COL + '3': frame3,
                 POS_COL: pos,
                 COUNT_COL: int(s0),
                 SCORE_MEAN_COL: s1 / s0,
@@ -156,13 +181,18 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
 
     # create output DataFrame
     kmer_base_df = pd.DataFrame(kmer_data_agg)
-    kmer_base_df = kmer_base_df.sort_values(by=[K_COL, KMER_COL, SEQNAME_COL, STRAND_COL, PHASE_COL, FRAME_COL,
-                                                FRAME_COL + '3', PHASE_COL]).reset_index(drop=True)
+
+    # sort
+    sortby_cols = [K_COL, KMER_COL, SEQNAME_COL, STRAND_COL, PHASE_COL, FTLEN_COL, FRAME_COL, PHASE_COL]
+    sort_ascending = [False if col==STRAND_COL else True for col in sortby_cols]
+    kmer_base_df = kmer_base_df.sort_values(by=sortby_cols, ascending=sort_ascending).reset_index(drop=True)
 
     logging.info(f'Computed score stats by k-mer, on {len(kmer_base_df)} k-mer outputs, '
                  f'for {feature_type_filter} feature types.')
 
-    return kmer_base_df
+    # temp_df = pd.DataFrame(temp_len_list)
+    # temp_df = temp_df.groupby(temp_df.columns.tolist(),as_index=False).size()
+    return kmer_base_df  # , temp_df
 
 
 def score_stats_by_dilated_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
@@ -275,7 +305,7 @@ def aggregate_over_position(df_in: pd.DataFrame):
     return df_agg
 
 
-def aggregate_over_additive_field(df_in: pd.DataFrame, additive_col: str):
+def aggregate_over_additive_field(df_in: pd.DataFrame, additive_col: Union[str, List[str]]):
     """
     Aggregate over an additive column field, i.e. a field where one needs to add the counts when aggregating over it.
     Each value of the field generally has different counts, so one must weigh by the counts.
@@ -287,10 +317,15 @@ def aggregate_over_additive_field(df_in: pd.DataFrame, additive_col: str):
     def count_weighted_std(s: pd.Series):
         return std_to_std_of_mean(s, weights=df_in.loc[s.index, 'count'])
 
-    groupby_cols = [col for col in df_in.columns if col in ID_COLS and col != additive_col]
+    if type(additive_col) == str:
+        additive_col = [additive_col]
+
+    groupby_cols = [col for col in df_in.columns if col in ID_COLS and col not in additive_col]
+    sort_ascending = [False if col==STRAND_COL else True for col in groupby_cols]
+
     df_agg = df_in.groupby(groupby_cols, as_index=False).agg(
             **{COUNT_COL: (COUNT_COL, 'sum'), SCORE_MEAN_COL: (SCORE_MEAN_COL, count_weighted_mean),
-             SCORE_STD_COL: (SCORE_STD_COL, count_weighted_std)})
+             SCORE_STD_COL: (SCORE_STD_COL, count_weighted_std)}).sort_values(by=groupby_cols, ascending=sort_ascending)
     return df_agg
 
 
@@ -302,6 +337,16 @@ def aggregate_over_frame(df_in: pd.DataFrame):
 def aggregate_over_seq_name(df_in: pd.DataFrame):
     """Aggregate over seq_name, which is an additive column field."""
     return aggregate_over_additive_field(df_in, SEQNAME_COL)
+
+
+def aggregate_over_strand(df_in: pd.DataFrame):
+    """Aggregate over strand, which is an additive column field."""
+    return aggregate_over_additive_field(df_in, STRAND_COL)
+
+
+def aggregate_over_phase(df_in: pd.DataFrame):
+    """Aggregate over phase, which is an additive column field."""
+    return aggregate_over_additive_field(df_in, PHASE_COL)
 
 
 def sample_extreme_score_sequences(seq_records_gen: Callable[[], Iterator[SeqRecord]],

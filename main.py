@@ -10,19 +10,21 @@ import visuals
 visuals=reload(visuals)
 import score_analysis
 score_analysis = reload(score_analysis)
+import pandas as pd
 
 from data.load import read_sequence, read_annotation_generator, read_gerp_scorer
 from data.paths import chr17_paths  # paths to source data files
 from data.process import get_train_test_x_y
-from score_collation import score_stats_by_kmer, score_stats_by_dilated_kmer, sample_extreme_score_sequences
+from score_collation import score_stats_by_kmer, score_stats_by_dilated_kmer, sample_extreme_score_sequences, aggregate_over_additive_field
 from score_nn_modeling import LocalWindowModel, ModelTrainer
-from score_analysis import mutual_information_by_dilation
+from score_analysis import mutual_information_by_dilation, corrcoefs_by_score_count
 from visuals import plot_mutual_information
 from genetic import get_feature_briefs
 
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
-
+pd.set_option('display.precision', 3)
+pd.options.mode.chained_assignment = None  # default='warn'
 
 if __name__ == '__main__':
     # start the analysis with human chromosome 17
