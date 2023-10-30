@@ -15,8 +15,8 @@ from Bio.Data.CodonTable import standard_dna_table
 from genetic import get_feature_briefs
 from util import periodic_logging, rd, std_to_std_of_mean
 
-ID_COLS = ['k', 'kmer', 'seq_name', 'strand', 'phase', 'ft_len', 'frame', 'pos']
-K_COL, KMER_COL, SEQNAME_COL, STRAND_COL, PHASE_COL, FTLEN_COL, FRAME_COL, POS_COL = ID_COLS
+ID_COLS = ['k', 'kmer', 'seq_name', 'strand', 'phase', 'ft_start', 'ft_len', 'frame', 'pos']
+K_COL, KMER_COL, SEQNAME_COL, STRAND_COL, PHASE_COL, FTSTART_COL, FTLEN_COL, FRAME_COL, POS_COL = ID_COLS
 DILATION_COL = 'dil'
 ID_COLS_GAP = [K_COL, KMER_COL, SEQNAME_COL, DILATION_COL, POS_COL]
 VALUE_COLS = ['count', 'score_mean', 'score_std']
@@ -116,6 +116,7 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
             if USE_SOFTMASKED:
                 ft_sequence = ft_sequence.upper()
             ft_scores = scorer(seq_name, start, end + 1)
+            ft_start = start % 3
             ft_len = len(ft_sequence) % 3
 
             # temp_len_list.append({'len%3': len(ft_sequence) % 3, 'phase': ft.phase, 'strand': ft.strand})
@@ -157,12 +158,12 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
 
                     # track running count, sum, and sum of squares
                     for pos in range(k):
-                        kmer_data[(k, cur_kmer, seq_name, ft.strand, ft.phase, ft_len, frame, pos)] += [1, cur_scores[pos], cur_scores[pos] ** 2]
+                        kmer_data[(k, cur_kmer, seq_name, ft.strand, ft.phase, ft_start, ft_len, frame, pos)] += [1, cur_scores[pos], cur_scores[pos] ** 2]
 
     # compute overall count, mean and standard deviation
     kmer_data_agg = []
     for key, sums in kmer_data.items():
-        k, cur_kmer, seq_name, strand, phase, ft_len, frame, pos = key
+        k, cur_kmer, seq_name, strand, phase, ft_start, ft_len, frame, pos = key
         s0, s1, s2 = sums
         kmer_data_agg.append(
             {
@@ -171,6 +172,7 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
                 SEQNAME_COL: seq_name,
                 STRAND_COL: strand,
                 PHASE_COL: phase,
+                FTSTART_COL: ft_start,
                 FTLEN_COL: ft_len,
                 FRAME_COL: frame,
                 POS_COL: pos,
@@ -183,7 +185,7 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
     kmer_base_df = pd.DataFrame(kmer_data_agg)
 
     # sort
-    sortby_cols = [K_COL, KMER_COL, SEQNAME_COL, STRAND_COL, PHASE_COL, FTLEN_COL, FRAME_COL, PHASE_COL]
+    sortby_cols = [K_COL, KMER_COL, SEQNAME_COL, STRAND_COL, PHASE_COL, FTSTART_COL, FTLEN_COL, FRAME_COL, PHASE_COL]
     sort_ascending = [False if col==STRAND_COL else True for col in sortby_cols]
     kmer_base_df = kmer_base_df.sort_values(by=sortby_cols, ascending=sort_ascending).reset_index(drop=True)
 
