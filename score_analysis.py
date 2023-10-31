@@ -8,7 +8,7 @@ from Bio.Seq import reverse_complement
 
 from genetic import kmers_in_rc_order
 from typing import Iterator, Callable, Iterable, Optional
-from score_collation import KMER_COL, COUNT_COL, SCORE_MEAN_COL, K_COL, ID_COLS, POS_COL, FRAME_COL
+from score_collation import KMER_COL, COUNT_COL, SCORE_MEAN_COL, K_COL, ID_COLS, POS_COL, FRAME_COL, STRAND_COL
 
 
 def corrcoefs_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, count_col: str = COUNT_COL,
@@ -33,7 +33,7 @@ def corrcoefs_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, coun
 
     # list to facilitate inverse position sorting in the reverse complement dataframe,
     # e.g. to measure correlation first position in kmer with last in kmer_rc, etc.
-    rc_sort_ascending = [False if col == POS_COL else True for col in sortby_cols]
+    rc_sort_ascending = [False if col in [POS_COL, STRAND_COL] else True for col in sortby_cols]
 
     for k in k_values:
         df_k = df[df[K_COL] == k]
@@ -70,9 +70,10 @@ def corrcoefs_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, coun
             # TODO: generalize this to k>3? Understand why this observation holds.
             # switch frames 0 and 1 in the reverse complement for correlation calculation purposes
             def frame_map(x):
-                return 1-x if x in [0, 1] else x
+                return (-k-x) % 3
 
-            df_kmer_rc.loc[:, FRAME_COL] = df_kmer_rc[FRAME_COL].map(frame_map)
+            if FRAME_COL in df_kmer.columns:
+                df_kmer_rc.loc[:, FRAME_COL] = df_kmer_rc[FRAME_COL].map(frame_map)
 
             # invert position sorting in reverse complement, if position column exists,
             df_kmer_rc = df_kmer_rc.sort_values(by=sortby_cols, ascending=rc_sort_ascending)
