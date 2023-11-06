@@ -17,6 +17,7 @@ from util import periodic_logging, rd, std_to_std_of_mean
 
 ID_COLS = ['k', 'kmer', 'seq_name', 'strand', 'phase', 'ft_start', 'ft_len', 'frame', 'pos']
 K_COL, KMER_COL, SEQNAME_COL, STRAND_COL, PHASE_COL, FTSTART_COL, FTLEN_COL, FRAME_COL, POS_COL = ID_COLS
+COMPLEMENTED_COLS = [STRAND_COL, FRAME_COL, POS_COL]
 DILATION_COL = 'dil'
 ID_COLS_GAP = [K_COL, KMER_COL, SEQNAME_COL, DILATION_COL, POS_COL]
 VALUE_COLS = ['count', 'score_mean', 'score_std']

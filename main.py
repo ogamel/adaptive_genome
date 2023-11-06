@@ -45,7 +45,8 @@ if __name__ == '__main__':
 
     """Analysis"""
     # # analyze by kmer for CDS (coding sequence) features
-    kmer_base_df = score_stats_by_kmer(seq_records_gen, gerp_scorer, ['CDS'], k_values=[1, 2, 3, 4, 5])
+    # kmer_base_df = score_stats_by_kmer(seq_records_gen, gerp_scorer, ['CDS'], k_values=[1, 2, 3, 4, 5])
+    kmer_base_df = score_stats_by_kmer(seq_records_gen, gerp_scorer, ['CDS'], k_values=[1,2,3,4,5])
 
     # # analyze by dilated kmer for CDS (coding sequence) features
     # kmer_base_df_cds = score_stats_by_dilated_kmer(seq_records_gen, gerp_scorer, ['CDS'], k_values=(1, 2,), dilations=range(1,20))
