@@ -87,9 +87,9 @@ def corrcoefs_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, coun
         corr_pairwise_count = np.corrcoef(*rc_pairwise_counts)[0][1]
         corr_pairwise_score = np.corrcoef(*rc_pairwise_scores)[0][1]
 
-        print(f'\nk = {k}, pairwise reverse complement correlation between '
-              f'\nk-mer counts {corr_pairwise_count:0.3f},'
-              f'\nk-mer scores {corr_pairwise_score:0.3f}.')
+        print(f'\tpairwise reverse complement correlation between '
+              f'\n\t\tk-mer counts {corr_pairwise_count:0.3f},'
+              f'\n\t\tk-mer scores {corr_pairwise_score:0.3f}.')
 
     return  # corr_count_score, corr_pairwise_count, corr_pairwise_score
 
@@ -102,10 +102,8 @@ def diff_stats_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, cou
     Input df is output from score_stats_by_kmer, possibly subsequently further aggregated.
     """
 
-    COUNT_DIFF_STD = 'cd/s'
-    SCORE_DIFF_STD = 'sd/s'
-    # CDR_SUFFIX = '_cdr'  # count diff ratio
-    # SDR_SUFFIX = '_sdr'  # score diff ratio
+    COUNT_DIFF = 'ct_d'
+    SCORE_DIFF = 'sc_d'
 
     if k_values is None:
         k_values = df_in[K_COL].unique()
@@ -114,13 +112,11 @@ def diff_stats_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, cou
     complemented_cols = [col for col in df_in.columns if col in COMPLEMENTED_COLS]
 
     df = df_in.sort_values(by=sortby_cols)
-    df[COUNT_DIFF_STD] = np.nan
-    df[SCORE_DIFF_STD] = np.nan
+    df[COUNT_DIFF] = pd.Series(dtype='Int64')
+    df[SCORE_DIFF] = pd.Series(dtype='float')
     for inverted_col in complemented_cols:
-        df[COUNT_DIFF_STD + '_' + inverted_col] = np.nan
-        df[SCORE_DIFF_STD + '_' + inverted_col] = np.nan
-        # df[inverted_col + CDR_SUFFIX] = np.nan
-        # df[inverted_col + SDR_SUFFIX] = np.nan
+        df[COUNT_DIFF + '_' + inverted_col] = pd.Series(dtype='Int64')
+        df[SCORE_DIFF + '_' + inverted_col] = pd.Series(dtype='float')
 
     # list to facilitate inverse position sorting in the reverse complement dataframe,
     # e.g. to measure correlation first position in kmer with last in kmer_rc, etc.
@@ -155,12 +151,10 @@ def diff_stats_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, cou
             # invert position sorting in reverse complement, if position column exists,
             df_kmer_rc = df_kmer_rc.sort_values(by=sortby_cols, ascending=rc_sort_ascending)
 
-            count_diff = df_kmer[count_col]-df_kmer_rc[count_col].values
-            score_diff = df_kmer[score_col]-df_kmer_rc[score_col].values
-            df_kmer[COUNT_DIFF_STD] = count_diff/np.std(df_k[count_col])
-            df[COUNT_DIFF_STD].update(df_kmer[COUNT_DIFF_STD])
-            df_kmer[SCORE_DIFF_STD] = score_diff/np.std(df_k[score_col])
-            df[SCORE_DIFF_STD].update(df_kmer[SCORE_DIFF_STD])
+            df_kmer[COUNT_DIFF] = df_kmer[count_col]-df_kmer_rc[count_col].values
+            df_kmer[SCORE_DIFF] = df_kmer[score_col]-df_kmer_rc[score_col].values
+            df_k.update(df_kmer[[COUNT_DIFF, SCORE_DIFF]])
+            df.update(df_k[[COUNT_DIFF, SCORE_DIFF]])
 
             # Need a ratio of difference between diff between one and its complement, to that to its "near complement"
             # where a given feature is replaced by a non-complement value. This is meant to show the relevance of this
@@ -180,37 +174,28 @@ def diff_stats_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, cou
                 # resort after shuffling
                 df_kmer_rc_cp = df_kmer_rc_cp.sort_values(by=sortby_cols, ascending=rc_sort_ascending)
 
-                count_diff = df_kmer[count_col] - df_kmer_rc_cp[count_col].values
-                score_diff = df_kmer[score_col] - df_kmer_rc_cp[score_col].values
-                df_kmer[COUNT_DIFF_STD + '_' + inverted_col] = count_diff / np.std(df_k[count_col])
-                df[COUNT_DIFF_STD + '_' + inverted_col].update(df_kmer[COUNT_DIFF_STD + '_' + inverted_col])
-                df_kmer[SCORE_DIFF_STD + '_' + inverted_col] = score_diff / np.std(df_k[score_col])
-                df[SCORE_DIFF_STD + '_' + inverted_col].update(df_kmer[SCORE_DIFF_STD + '_' + inverted_col])
+                df_kmer[COUNT_DIFF + '_' + inverted_col] = df_kmer[count_col] - df_kmer_rc_cp[count_col].values
+                df_kmer[SCORE_DIFF + '_' + inverted_col] = df_kmer[score_col] - df_kmer_rc_cp[score_col].values
+                df_k.update(df_kmer[[COUNT_DIFF + '_' + inverted_col, SCORE_DIFF + '_' + inverted_col]])
+                df.update(df_k[[COUNT_DIFF + '_' + inverted_col, SCORE_DIFF + '_' + inverted_col]])
 
-                # df_kmer[inverted_col + CDR_SUFFIX] = count_diff/(df_kmer[count_col] - df_kmer_rc_cp[count_col].values)
-                # df[inverted_col + CDR_SUFFIX].update(df_kmer[inverted_col + CDR_SUFFIX])
-                # df_kmer[inverted_col + SDR_SUFFIX] = score_diff/(df_kmer[score_col] - df_kmer_rc_cp[score_col].values)
-                # df[inverted_col + SDR_SUFFIX].update(df_kmer[inverted_col + SDR_SUFFIX])
+        count_std_k = np.std(df_k[count_col])
+        score_std_k = np.std(df_k[score_col])
 
         # equivalent to mean square difference / 2, where difference is measure in units of std. dev.
-        print(f'\nk = {k}. Mean square difference, in units of overall std. dev., '
-              f'between pairs complementary in columns:'
+        print(f'\nk = {k}. Root mean square difference (normalized by twice the overall std. dev.) between pairs '
+              f'complementary in columns:'
               f'\n\t\t{", ".join(complemented_cols)}'
-              f'\n\t\t\tCounts: {(df[COUNT_DIFF_STD]**2).mean():.4f}. Score: {(df[SCORE_DIFF_STD]**2).mean():.4f}.')
-              # f'\n\t\t\tCounts: {df[COUNT_DIFF_STD].abs().mean():.4f}. Score: {df[SCORE_DIFF_STD].abs().mean():.4f}.')
+              f'\n\t\t\tCounts: {np.sqrt((df_k[COUNT_DIFF]**2).mean())/(2 * count_std_k):.4f}. '
+              f'Score: {np.sqrt((df_k[SCORE_DIFF]**2).mean())/(2 * score_std_k):.4f}.')
+
 
         for inverted_col in complemented_cols:
             print(f'\t\t above except for {inverted_col}'
-                  f'\n\t\t\tCounts: {(df[COUNT_DIFF_STD + "_" + inverted_col]**2).mean():.4f}. '
-                  f'Score: {(df[SCORE_DIFF_STD + "_" + inverted_col]**2).mean():.4f}.')
-                  # f'\n\t\t\tCounts: {df[COUNT_DIFF_STD + "_" + inverted_col].abs().mean():.4f}. '
-                  # f'Score: {df[SCORE_DIFF_STD + "_" + inverted_col].abs().mean():.4f}.')
+                  f'\n\t\t\tCounts: {np.sqrt((df_k[COUNT_DIFF + "_" + inverted_col]**2).mean())/(2 * count_std_k):.4f}. '
+                  f'Score: {np.sqrt((df_k[SCORE_DIFF + "_" + inverted_col]**2).mean())/(2 * score_std_k):.4f}.')
 
-            # print(f'Geometric Mean absolute difference ratio between complementary pair and a non-complementary pair in {inverted_col}.'
-            #       f'\nCounts: {gmean(df[np.isfinite(df[inverted_col + CDR_SUFFIX])][inverted_col + CDR_SUFFIX].abs()):.4f}. '
-            #       f'Score: {gmean(df[np.isfinite(df[inverted_col + SDR_SUFFIX])][inverted_col + SDR_SUFFIX].abs()):.4f}.')
-
-    return df[np.isfinite(df[COUNT_DIFF_STD])]
+    return df  #[np.isfinite(df[COUNT_DIFF])]
 
 
 def mutual_information_by_dilation(df_in: pd.DataFrame, do_triple:bool = False) -> pd.DataFrame:
