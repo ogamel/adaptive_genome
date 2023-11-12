@@ -15,9 +15,11 @@ from Bio.Data.CodonTable import standard_dna_table
 from genetic import get_feature_briefs
 from util import periodic_logging, rd, std_to_std_of_mean
 
-ID_COLS = ['k', 'kmer', 'seq_name', 'strand', 'phase', 'ft_start', 'ft_len', 'frame', 'pos']
-K_COL, KMER_COL, SEQNAME_COL, STRAND_COL, PHASE_COL, FTSTART_COL, FTLEN_COL, FRAME_COL, POS_COL = ID_COLS
-COMPLEMENTED_COLS = [STRAND_COL, FRAME_COL, POS_COL]
+ID_COLS = ['k', 'kmer', 'seq_name', 'strand', 'phase', 'ft_start', 'ft_len', 'ph_len', 'frame', 'pos']
+# ID_COLS = ['k', 'kmer', 'seq_name', 'strand', 'phase', 'ft_start', 'ft_len', 'ph+ftlen', 'frame', 'pos']
+K_COL, KMER_COL, SEQNAME_COL, STRAND_COL, PHASE_COL, FTSTART_COL, FTLEN_COL, PHASE_LEN_COL, FRAME_COL, POS_COL = ID_COLS
+COMPLEMENTED_COLS = [STRAND_COL, FRAME_COL, POS_COL, PHASE_COL, FTSTART_COL, FTLEN_COL, PHASE_LEN_COL]
+# output df should contain only two of PHASE_COL, FTLEN_COL, PHASE_LEN_COL, since the last is the sum of the first two
 DILATION_COL = 'dil'
 ID_COLS_GAP = [K_COL, KMER_COL, SEQNAME_COL, DILATION_COL, POS_COL]
 VALUE_COLS = ['count', 'score_mean', 'score_std']
@@ -98,7 +100,7 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
         seq_name = seq_record.name
         logging.info(f'Sequence {seq_name} ...')
 
-        feature_briefs = get_feature_briefs(seq_record, feature_type_filter)
+        feature_briefs = get_feature_briefs(seq_record, feature_type_filter, merge_overlapping_features=True)
         # temp_len_list = []
         for i, ft in enumerate(feature_briefs):
             periodic_logging(i, f'Processing feature {i:,}.', v=len(feature_briefs)//10)
@@ -144,6 +146,7 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
                             continue
 
                     frame = (ind - (k-1)) % 3
+                    ph_len = (ft.phase+ft_len) % 3
 
                     # # ind just index the last nucleotide in the kmer.
                     # if ft.strand == 1:
@@ -159,12 +162,12 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
 
                     # track running count, sum, and sum of squares
                     for pos in range(k):
-                        kmer_data[(k, cur_kmer, seq_name, ft.strand, ft.phase, ft_start, ft_len, frame, pos)] += [1, cur_scores[pos], cur_scores[pos] ** 2]
+                        kmer_data[(k, cur_kmer, seq_name, ft.strand, ph_len, ft_start, ft_len, frame, pos)] += [1, cur_scores[pos], cur_scores[pos] ** 2]
 
     # compute overall count, mean and standard deviation
     kmer_data_agg = []
     for key, sums in kmer_data.items():
-        k, cur_kmer, seq_name, strand, phase, ft_start, ft_len, frame, pos = key
+        k, cur_kmer, seq_name, strand, phase_len, ft_start, ft_len, frame, pos = key
         s0, s1, s2 = sums
         kmer_data_agg.append(
             {
@@ -172,7 +175,8 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
                 KMER_COL: cur_kmer,
                 SEQNAME_COL: seq_name,
                 STRAND_COL: strand,
-                PHASE_COL: phase,
+                # PHASE_COL: phase,
+                PHASE_LEN_COL: phase_len,
                 FTSTART_COL: ft_start,
                 FTLEN_COL: ft_len,
                 FRAME_COL: frame,
@@ -186,7 +190,7 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
     kmer_base_df = pd.DataFrame(kmer_data_agg)
 
     # sort
-    sortby_cols = [K_COL, KMER_COL, SEQNAME_COL, STRAND_COL, PHASE_COL, FTSTART_COL, FTLEN_COL, FRAME_COL, PHASE_COL]
+    sortby_cols = [K_COL, KMER_COL, SEQNAME_COL, STRAND_COL, PHASE_LEN_COL, FTSTART_COL, FTLEN_COL, FRAME_COL]
     sort_ascending = [False if col==STRAND_COL else True for col in sortby_cols]
     kmer_base_df = kmer_base_df.sort_values(by=sortby_cols, ascending=sort_ascending).reset_index(drop=True)
 

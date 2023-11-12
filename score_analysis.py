@@ -10,7 +10,7 @@ from Bio.Seq import reverse_complement
 from genetic import kmers_in_rc_order
 from typing import Iterator, Callable, Iterable, Optional
 from score_collation import KMER_COL, COUNT_COL, SCORE_MEAN_COL, SCORE_STD_COL, \
-    K_COL, ID_COLS, POS_COL, FRAME_COL, STRAND_COL, COMPLEMENTED_COLS
+    K_COL, ID_COLS, POS_COL, FRAME_COL, STRAND_COL, PHASE_LEN_COL, FTLEN_COL, COMPLEMENTED_COLS
 
 
 def corrcoefs_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, count_col: str = COUNT_COL,
@@ -35,7 +35,11 @@ def corrcoefs_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, coun
 
     # list to facilitate inverse position and strand sorting in the reverse complement dataframe,
     # e.g. to measure correlation first position in kmer with last in kmer_rc, etc.
-    rc_sort_ascending = [False if col in [POS_COL, STRAND_COL] else True for col in sortby_cols]
+    rc_sort_ascending = [False if col in [POS_COL, STRAND_COL, FTLEN_COL] else True for col in sortby_cols]
+    # PHASE_LEN_COL sort ascending
+
+    print(sortby_cols)
+    print(rc_sort_ascending)
 
     for k in k_values:
         # Empirically discovered frame correlation map. Need to understand why this observation holds.
@@ -164,11 +168,13 @@ def diff_stats_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, cou
                 if inverted_col == POS_COL:
                     # shuffle position in RC, from complement position to +1 (arbitrarily)
                     df_kmer_rc_cp[inverted_col] = (df_kmer_rc_cp[inverted_col] + 1) % k
-                elif inverted_col == FRAME_COL:
+                elif inverted_col in [FRAME_COL, PHASE_LEN_COL, FTLEN_COL]:
                     # shuffle frame in RC, from complement frame to +1 (arbitrarily)
                     df_kmer_rc_cp[inverted_col] = (df_kmer_rc_cp[inverted_col] + 1) % 3
+                elif inverted_col == STRAND_COL:
+                    df_kmer_rc_cp[inverted_col] = - df_kmer_rc_cp[inverted_col]
                 else:
-                    # make RC column same as original (e.g. for STRAND_COL)
+                    # make RC column same as original
                     df_kmer_rc_cp[inverted_col] = df_kmer[inverted_col].values
 
                 # resort after shuffling
