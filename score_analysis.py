@@ -36,15 +36,17 @@ def corrcoefs_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, coun
     # list to facilitate inverse position and strand sorting in the reverse complement dataframe,
     # e.g. to measure correlation first position in kmer with last in kmer_rc, etc.
     rc_sort_ascending = [False if col in [POS_COL, STRAND_COL, FTLEN_COL] else True for col in sortby_cols]
+    # rc_sort_ascending = [False if col in [POS_COL, STRAND_COL, FTLEN_COL, FRAME_COL] else True for col in sortby_cols]
     # PHASE_LEN_COL sort ascending
 
-    print(sortby_cols)
-    print(rc_sort_ascending)
+    # print(sortby_cols)
+    # print(rc_sort_ascending)
 
     for k in k_values:
         # Empirically discovered frame correlation map. Need to understand why this observation holds.
         def frame_map(x):
-            return (-k - x) % 3
+            return 2 - x
+            # return (-k - x) % 3
 
         df_k = df[df[K_COL] == k]
 
@@ -77,8 +79,8 @@ def corrcoefs_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, coun
             df_kmer = df_k[df_k[KMER_COL] == kmer]
             df_kmer_rc = df_k[df_k[KMER_COL] == kmer_rc]
 
-            if FRAME_COL in df_kmer.columns:
-                df_kmer_rc.loc[:, FRAME_COL] = df_kmer_rc[FRAME_COL].map(frame_map)
+            # if FRAME_COL in df_kmer.columns:
+            #     df_kmer_rc.loc[:, FRAME_COL] = df_kmer_rc[FRAME_COL].map(frame_map)
 
             # invert position sorting in reverse complement, if position column exists,
             df_kmer_rc = df_kmer_rc.sort_values(by=sortby_cols, ascending=rc_sort_ascending)
@@ -125,11 +127,13 @@ def diff_stats_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, cou
     # list to facilitate inverse position sorting in the reverse complement dataframe,
     # e.g. to measure correlation first position in kmer with last in kmer_rc, etc.
     rc_sort_ascending = [False if col in [POS_COL, STRAND_COL] else True for col in sortby_cols]
+    # rc_sort_ascending = [False if col in [POS_COL, STRAND_COL, FRAME_COL] else True for col in sortby_cols]
 
     for k in k_values:
         # Empirically discovered frame correlation map. Need to understand why this observation holds.
         def frame_map(x):
-            return (-k - x) % 3
+            return 2 - x
+            # return (-k - x) % 3
 
         df_k = df[df[K_COL] == k]
 
@@ -149,8 +153,8 @@ def diff_stats_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, cou
             df_kmer = df_k[df_k[KMER_COL] == kmer]
             df_kmer_rc = df_k[df_k[KMER_COL] == kmer_rc]
 
-            if FRAME_COL in df_kmer.columns:
-                df_kmer_rc.loc[:, FRAME_COL] = df_kmer_rc[FRAME_COL].map(frame_map)
+            # if FRAME_COL in df_kmer.columns:
+            #     df_kmer_rc.loc[:, FRAME_COL] = df_kmer_rc[FRAME_COL].map(frame_map)
 
             # invert position sorting in reverse complement, if position column exists,
             df_kmer_rc = df_kmer_rc.sort_values(by=sortby_cols, ascending=rc_sort_ascending)
