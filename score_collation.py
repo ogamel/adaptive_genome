@@ -15,11 +15,9 @@ from Bio.Data.CodonTable import standard_dna_table
 from genetic import get_feature_briefs
 from util import periodic_logging, rd, std_to_std_of_mean
 
-ID_COLS = ['k', 'kmer', 'seq_name', 'strand', 'phase', 'ft_start', 'ft_len', 'ph_len', 'frame', 'pos']
-# ID_COLS = ['k', 'kmer', 'seq_name', 'strand', 'phase', 'ft_start', 'ft_len', 'ph+ftlen', 'frame', 'pos']
-K_COL, KMER_COL, SEQNAME_COL, STRAND_COL, PHASE_COL, FTSTART_COL, FTLEN_COL, PHASE_LEN_COL, FRAME_COL, POS_COL = ID_COLS
-COMPLEMENTED_COLS = [STRAND_COL, FRAME_COL, POS_COL, PHASE_COL, FTSTART_COL, FTLEN_COL, PHASE_LEN_COL]
-# output df should contain only two of PHASE_COL, FTLEN_COL, PHASE_LEN_COL, since the last is the sum of the first two
+ID_COLS = ['k', 'kmer', 'seq_name', 'strand', 'phase', 'ft_start', 'ft_len', 'frame', 'pos']
+K_COL, KMER_COL, SEQNAME_COL, STRAND_COL, PHASE_COL, FTSTART_COL, FTLEN_COL, FRAME_COL, POS_COL = ID_COLS
+COMPLEMENTED_COLS = [STRAND_COL, FRAME_COL, POS_COL, PHASE_COL, FTSTART_COL, FTLEN_COL]
 DILATION_COL = 'dil'
 ID_COLS_GAP = [K_COL, KMER_COL, SEQNAME_COL, DILATION_COL, POS_COL]
 VALUE_COLS = ['count', 'score_mean', 'score_std']
@@ -59,7 +57,7 @@ def score_stats_by_feature_type(seq_records_gen: Callable[[], Iterator[SeqRecord
                     {
                         'seq_name': seq_name,
                         'type': ft.type,
-                        's0': ft.end - ft.start + 1,  # score count (i.e. feature length in number of nucleotides)
+                        's0': ft.end - ft.start,  # score count (i.e. feature length in number of nucleotides)
                         's1': s1,  # score sum
                         's2': s2,  # score sum of squares
                         'subfeatures': ft.subfeatures,
@@ -105,14 +103,6 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
         for i, ft in enumerate(feature_briefs):
             periodic_logging(i, f'Processing feature {i:,}.', v=len(feature_briefs)//10)
 
-            # # choose start and end such that chosen sequence is multiple of 3 and
-            # if ft.phase is None:
-            #     start, end = ft.start, ft.end
-            # else:
-            #     if ft.strand == 1:
-            #         start = ft.start + ft.phase
-            #     else:  # ft.strand == -1
-            #         start =
             start, end = ft.start, ft.end
 
             ft_sequence = seq_record.seq[start: end]  # str
@@ -147,22 +137,23 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
 
                     # frame = (ind - (k-1)) % 3
                     # ph_len = (ft.phase+ft_len) % 3
+                    phase = ft.phase if ft.phase is not None else 0
+                    # print(phase, ft.strand)
 
-                    # ind just index the last nucleotide in the kmer.
-                    if ft.strand == 1:
-                        frame = (ind - (k-1) - ft.phase) % 3
-                    else:  # ft.strand == -1
-                        # frame = (len(ft_sequence) - ind - k - ft.phase) % 3
-                        frame = (len(ft_sequence) - ind - 1 - ft.phase) % 3
-
-                    # # Instead, we calculate kmer_ind, which is the
-                    # # index of the first nucleotide in a sense strand, or last nucleotide in an anti-sense strand
-                    # kmer_ind = ind - (k-1) if ft.strand == 1 else len(ft_sequence) - ind - 1
-                    # frame = (kmer_ind + ft.phase) % 3
+                    try:
+                        # ind is the index of the last nucleotide in the kmer.
+                        if ft.strand is None or ft.strand == 1:
+                            frame = (ind - (k-1) - phase) % 3
+                        elif ft.strand == -1:
+                            frame = (len(ft_sequence) - ind - 1 - phase) % 3
+                        else:
+                            frame = (ind - (k - 1)) % 3
+                    except:
+                        print(ft.strand, phase, ft)
 
                     # track running count, sum, and sum of squares
                     for pos in range(k):
-                        kmer_data[(k, cur_kmer, seq_name, ft.strand, ft.phase, ft_start, ft_len, frame, pos)] += [1, cur_scores[pos], cur_scores[pos] ** 2]
+                        kmer_data[(k, cur_kmer, seq_name, ft.strand, phase, ft_start, ft_len, frame, pos)] += [1, cur_scores[pos], cur_scores[pos] ** 2]
 
     # compute overall count, mean and standard deviation
     kmer_data_agg = []
@@ -176,7 +167,6 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
                 SEQNAME_COL: seq_name,
                 STRAND_COL: strand,
                 PHASE_COL: phase,
-                # PHASE_LEN_COL: phase_len,
                 FTSTART_COL: ft_start,
                 FTLEN_COL: ft_len,
                 FRAME_COL: frame,
@@ -215,8 +205,9 @@ def score_stats_by_dilated_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord
     k_values Iterable[int]: k values to analyze.
     """
 
-    def update_kmer_data(kmer_data, sequence, scores):
-        """Mutates kmer_data dictionary to add the information the input sequence."""
+    def update_kmer_data(kmer_data, sequence, scores, strand, phase):
+        """Mutates kmer_data dictionary to add the information in the input sequence."""
+
         for k in k_values:
             for dilation in dilations:
                 for ind in range(len(sequence) - k * dilation):
@@ -226,9 +217,21 @@ def score_stats_by_dilated_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord
                     if any(np.isnan(cur_scores)) or (set(cur_kmer) - NUCLEOTIDES):
                         continue
 
+                    try:
+                        # ind is the index of the last nucleotide in the kmer.
+                        if strand == 1:
+                            frame = (ind - (k-1) - phase) % 3
+                        elif ft.strand == -1:
+                            frame = (len(sequence) - ind - 1 - phase) % 3
+                        else:
+                            frame = (ind - (k - 1)) % 3
+                    except:
+                        print(strand, phase, ft)
+
                     # track running count, sum, and sum of squares
                     for pos in range(k):
-                        kmer_data[(k, cur_kmer, seq_name, dilation, pos)] += [1, cur_scores[pos], cur_scores[pos] ** 2]
+                        kmer_data[(k, cur_kmer, seq_name, dilation, ft.strand, frame, pos)] += \
+                            [1, cur_scores[pos], cur_scores[pos] ** 2]
 
                 if k ==1:
                     break
@@ -246,12 +249,12 @@ def score_stats_by_dilated_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord
             for i, ft in enumerate(feature_briefs):
                 periodic_logging(i, f'Processing feature {i:,}.', v=len(feature_briefs)//10)
 
-                ft_sequence = seq_record.seq[ft.start: ft.end + 1]
+                ft_sequence = seq_record.seq[ft.start: ft.end]
                 if USE_SOFTMASKED:
                     ft_sequence = ft_sequence.upper()
-                ft_scores = scorer(seq_name, ft.start, ft.end + 1)
 
-                update_kmer_data(kmer_data, ft_sequence, ft_scores)
+                ft_scores = scorer(seq_name, ft.start, ft.end)
+                update_kmer_data(kmer_data, ft_sequence, ft_scores, ft.strand, ft.phase)
         else:
             random.seed(seed)
             starts = random.sample(range(len(seq_record)-chunk_size), num_chunks)
@@ -274,7 +277,7 @@ def score_stats_by_dilated_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord
     # compute overall count, mean and standard deviation
     kmer_data_agg = []
     for key, sums in kmer_data.items():
-        k, cur_kmer, seq_name, dilation, pos = key
+        k, cur_kmer, seq_name, dilation, strand, frame, pos = key
         s0, s1, s2 = sums
         kmer_data_agg.append(
             {
@@ -282,6 +285,8 @@ def score_stats_by_dilated_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord
                 KMER_COL: cur_kmer,
                 SEQNAME_COL: seq_name,
                 DILATION_COL: dilation,
+                STRAND_COL: strand,
+                FRAME_COL: frame,
                 POS_COL: pos,
                 COUNT_COL:  int(s0),
                 SCORE_MEAN_COL: s1/s0,
@@ -294,8 +299,9 @@ def score_stats_by_dilated_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord
         f'on {num_chunks} random seqeunce chunks of size {chunk_size:,} each.'
 
     logging.info(f'Computed score stats by k-mer, on {len(kmer_base_df)} k-mer outputs, {out_text}')
+    kmer_base_df = kmer_base_df.sort_values(by=[K_COL, KMER_COL, SEQNAME_COL, STRAND_COL, FRAME_COL, POS_COL])
+    kmer_base_df = kmer_base_df.reset_index(drop=True)
 
-    print(kmer_base_df.to_string())
     return kmer_base_df
 
 
@@ -381,10 +387,10 @@ def sample_extreme_score_sequences(seq_records_gen: Callable[[], Iterator[SeqRec
         for i, ft in enumerate(feature_briefs):
             periodic_logging(i, f'Processing feature {i:,}.', v=len(feature_briefs)//10)
 
-            ft_sequence = seq_record.seq[ft.start: ft.end + 1]  # str
+            ft_sequence = seq_record.seq[ft.start: ft.end]  # str
             if USE_SOFTMASKED:
                 ft_sequence = ft_sequence.upper()
-            ft_scores = scorer(seq_name, ft.start, ft.end + 1)
+            ft_scores = scorer(seq_name, ft.start, ft.end)
 
             j = 0
             while j < len(ft_scores):
