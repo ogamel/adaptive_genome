@@ -211,60 +211,73 @@ def mutual_information_by_dilation(df_in: pd.DataFrame, do_triple:bool = False) 
     # TODO: check for each kmer before the sum, in case it is high for particular combinations... ...
     # TODO: right now doing just counts extend to score somehow
 
+    # columns we will group the probabilities by - usually strand and frame
     complemented_cols = [col for col in COMPLEMENTED_COLS if col in df_in.columns and col != POS_COL]
 
-    # get mono-nucleotide probabilities
+    """Mono-nucleotide probabilities"""
     df1 = df_in[(df_in.k == 1)].copy()
     df1['prob'] = df1[COUNT_COL] / df1.groupby(complemented_cols + ['dil'])[COUNT_COL].transform(sum)
 
+    # aggregated by kmer
     df1_agg = df1[[KMER_COL, COUNT_COL]].groupby([KMER_COL]).aggregate(sum)
     df1_agg['prob'] = df1_agg[COUNT_COL] / df1_agg[COUNT_COL].sum()
     df1_agg = df1_agg.reset_index()
 
+    # entropy contribution per mononucleotide
+    df1['prob_h'] = - df1['prob']*np.log(df1['prob'])
+
+    # mutual information normalization factor for each strand and frame value, to get I_norm from I.
+    # seems unnecessary to separate them by strand and value as the factors are all very close.
+    df_norm_factor = df1[complemented_cols + ['prob_h']].groupby(complemented_cols).agg(sum)
+
+    # function to return mono-nucleotide probability, as a function of strand and frame
     def single_prob(kmer, s=None, f=None):
         if s is None or f is None:
             return df1_agg[(df1_agg[KMER_COL] == kmer)]['prob'].values[0]
         else:
-            return df1[(df1[KMER_COL] == kmer) & (df1.strand == s) & (df1.frame == f)]['prob'].values[0]
+            return df1[(df1[KMER_COL] == kmer) & (df1[STRAND_COL] == s) & (df1[FRAME_COL] == f)]['prob'].values[0]
 
-    # get dilated base pair probabilities - df by kmer
+    """Dilated dimer probabilities."""
     df_kmer = df_in[(df_in.k == 2) & (df_in.pos == 0)].copy()
-    df_kmer_agg = df_kmer[[K_COL, KMER_COL, 'dil', COUNT_COL]].groupby([K_COL, KMER_COL, 'dil']).aggregate(sum)
-
     df_kmer['prob'] = df_kmer[COUNT_COL] / df_kmer.groupby(complemented_cols + ['dil'])[COUNT_COL].transform(sum)
+
+    # probabilities of each base pair in the 2-mer
+    df_kmer['prob_pos0'] = df_kmer.apply(
+        lambda x: single_prob(x[KMER_COL][0], x[STRAND_COL], x[FRAME_COL]), axis=1)
+    df_kmer['prob_pos1'] = df_kmer.apply(  # second base has a different frame, depending on dilation
+        lambda x: single_prob(x[KMER_COL][1], x[STRAND_COL], (x[FRAME_COL] + x[STRAND_COL] * x['dil']) % 3), axis=1)
+
+    # mutual information
+    df_kmer['I'] = (df_kmer.prob * np.log(df_kmer.prob / (df_kmer.prob_pos0 * df_kmer.prob_pos1)))
+    # simplify with mean, equivalent to not splitting by complemented_cols in the first place
+    df_kmer['I_norm'] = df_kmer['I'] / df_norm_factor['prob_h'].mean()
+    # Note: can define this with separate normalization factor for each strand and frame, but not much difference
+
+    """Dilated dimer probabilities, aggregated by kmer."""
+    df_kmer_agg = df_kmer[[K_COL, KMER_COL, 'dil', COUNT_COL]].groupby([K_COL, KMER_COL, 'dil']).aggregate(sum)
     df_kmer_agg['prob'] = df_kmer_agg[COUNT_COL] / df_kmer_agg.groupby(['dil'])[COUNT_COL].transform(sum)
     df_kmer_agg = df_kmer_agg.reset_index()
 
     # probabilities of each base pair in the 2-mer
-    df_kmer['prob_pos0'] = df_kmer.apply(lambda x: single_prob(x[KMER_COL][0], x[STRAND_COL], x[FRAME_COL]), axis=1)
-    df_kmer['prob_pos1'] = df_kmer.apply(lambda x: single_prob(x[KMER_COL][1], x[STRAND_COL], (x[FRAME_COL] + x['dil']) % 3),
-                                       axis=1)  # second base has a different frame, depending on dilation
     df_kmer_agg['prob_pos0'] = df_kmer_agg[KMER_COL].str[0].map(single_prob)
     df_kmer_agg['prob_pos1'] = df_kmer_agg[KMER_COL].str[1].map(single_prob)
 
     # mutual information
-    df_kmer['I'] = (df_kmer.prob * np.log(df_kmer.prob / (df_kmer.prob_pos0 * df_kmer.prob_pos1)))
     df_kmer_agg['I'] = (df_kmer_agg.prob * np.log(df_kmer_agg.prob / (df_kmer_agg.prob_pos0 * df_kmer_agg.prob_pos1)))
+    df_kmer_agg['I_norm'] = df_kmer_agg['I'] / (- df1_agg.prob * np.log(df1_agg.prob)).sum()
 
-    # normalized mutual information - normalization factor
-    df_kmer_agg['I_norm'] = df_kmer_agg['I'] / (- df1.prob * np.log(df1.prob)).sum()
-    # here we get a different normalization for each strand and frame, but this turns out unnecessary as the
-    # normalization factors are all very close.
-    df1['prob_h'] = - df1['prob']*np.log(df1['prob'])  # entropy contribution
-    df_norm = df1[complemented_cols + ['prob_h']].groupby(complemented_cols).agg(sum)
-
-    # simplify with mean, equivalent to not splitting by complemented_cols in the first place
-    df_kmer['I_norm'] = df_kmer['I'] / df_norm['prob_h'].mean()
-    # Note: can define this with separate normalization factor for each strand and frame, but not much difference
-
+    """Summary dataframes."""
     df_summary = df_kmer[['k', 'dil'] + complemented_cols + ['I', 'I_norm']].groupby(['k', 'dil'] + complemented_cols)\
         .aggregate(sum).reset_index()
     df_summary_agg = df_kmer_agg[['k', 'dil', 'I', 'I_norm']].groupby(['k', 'dil']).aggregate(sum).reset_index()
 
-    # TODO: include some measure of this for each specific kmer - perhaps a curve for each 2-mer with dilation on x axis
-
+    # add aggregated data to the same dataframe, with empty strand and frame columns.
     df_summary = df_summary.merge(df_summary_agg, how='outer')
+
+    df_summary[STRAND_COL] = df_summary[STRAND_COL].astype("Int64")
+    df_summary[FRAME_COL] = df_summary[FRAME_COL].astype("Int64")
     return df_summary
+
 
 # TODO: compute mutual information of k-mer vs its subwords ... e.g. P(ACC) vs P(A)P(C)P(C) vs P(AC)P(C) vs P(A)P(CC)
 # seems this needs deep thought and defining new quantities to truly understand it
@@ -274,4 +287,5 @@ def mutual_information_by_dilation(df_in: pd.DataFrame, do_triple:bool = False) 
 #  level
 
 # TODO: check amino acid network ... i.e. reverse complement leads to another AA? but that is on opposite strand.
-#  May be look at sum of frequency of all codons that make same AA. actually, does RC imply anything about relative frequency of AA? I don't think anything simple 
+#  May be look at sum of frequency of all codons that make same AA. actually, does RC imply anything about relative
+#  frequency of AA? I don't think anything simple

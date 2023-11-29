@@ -12,6 +12,7 @@ import score_analysis
 import score_collation
 score_analysis = reload(score_analysis)
 score_collation = reload(score_collation)
+visuals = reload(visuals)
 import pandas as pd
 
 from data.load import read_sequence, read_annotation_generator, read_gerp_scorer
