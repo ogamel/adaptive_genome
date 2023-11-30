@@ -45,7 +45,7 @@ if __name__ == '__main__':
     # get GERP retrieval function, from the BigWig file
     gerp_scorer = read_gerp_scorer(paths.gerp)
 
-    df= score_stats_by_feature_type(seq_records_gen, gerp_scorer)
+    # df= score_stats_by_feature_type(seq_records_gen, gerp_scorer)
 
     """Analysis"""
     # # analyze by kmer for CDS (coding sequence) features

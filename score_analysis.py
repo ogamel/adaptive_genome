@@ -242,10 +242,11 @@ def mutual_information_by_dilation(df_in: pd.DataFrame, do_triple:bool = False) 
     df_kmer['prob'] = df_kmer[COUNT_COL] / df_kmer.groupby(complemented_cols + ['dil'])[COUNT_COL].transform(sum)
 
     # probabilities of each base pair in the 2-mer
+    # frame in the second base has a different frame, depending on strand and dilation
     df_kmer['prob_pos0'] = df_kmer.apply(
-        lambda x: single_prob(x[KMER_COL][0], x[STRAND_COL], x[FRAME_COL]), axis=1)
-    df_kmer['prob_pos1'] = df_kmer.apply(  # second base has a different frame, depending on dilation
-        lambda x: single_prob(x[KMER_COL][1], x[STRAND_COL], (x[FRAME_COL] + x[STRAND_COL] * x['dil']) % 3), axis=1)
+        lambda x: single_prob(x[KMER_COL][0], x[STRAND_COL], (x[FRAME_COL] + (x[STRAND_COL]==-1)*x['dil']) % 3), axis=1)
+    df_kmer['prob_pos1'] = df_kmer.apply(
+        lambda x: single_prob(x[KMER_COL][1], x[STRAND_COL], (x[FRAME_COL] + (x[STRAND_COL]==1)*x['dil']) % 3), axis=1)
 
     # mutual information
     df_kmer['I'] = (df_kmer.prob * np.log(df_kmer.prob / (df_kmer.prob_pos0 * df_kmer.prob_pos1)))

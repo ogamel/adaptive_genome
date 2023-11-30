@@ -218,13 +218,13 @@ def score_stats_by_dilated_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord
                         continue
 
                     try:
-                        # ind is the index of the last nucleotide in the kmer.
+                        # ind is the index of the first nucleotide in the dilated kmer.
                         if strand == 1:
-                            frame = (ind - (k-1) - phase) % 3
+                            frame = (ind - phase) % 3
                         elif ft.strand == -1:
-                            frame = (len(sequence) - ind - 1 - phase) % 3
+                            frame = (len(sequence) - (ind + (k-1) * dilation) - 1 - phase) % 3
                         else:
-                            frame = (ind - (k - 1)) % 3
+                            frame = ind % 3
                     except:
                         print(strand, phase, ft)
 
