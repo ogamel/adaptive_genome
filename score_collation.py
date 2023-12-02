@@ -233,7 +233,7 @@ def score_stats_by_dilated_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord
                         kmer_data[(k, cur_kmer, seq_name, dilation, ft.strand, frame, pos)] += \
                             [1, cur_scores[pos], cur_scores[pos] ** 2]
 
-                if k ==1:
+                if k == 1:
                     break
         return
 
@@ -272,6 +272,7 @@ def score_stats_by_dilated_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord
                 chunk_sequence = seq_record.seq[start: start + chunk_size]
                 chunk_scores = scorer(seq_name, start, start + chunk_size)
 
+                # TODO: expand update_kmer_data to accept no input of strand and frame
                 update_kmer_data(kmer_data, chunk_sequence, chunk_scores)
 
     # compute overall count, mean and standard deviation

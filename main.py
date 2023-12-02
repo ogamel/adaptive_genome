@@ -48,20 +48,23 @@ if __name__ == '__main__':
     # df= score_stats_by_feature_type(seq_records_gen, gerp_scorer)
 
     """Analysis"""
-    # # analyze by kmer for CDS (coding sequence) features
-    # kmer_base_df = score_stats_by_kmer(seq_records_gen, gerp_scorer, ['CDS'], k_values=[1, 2, 3, 4, 5])
-    # # kmer_base_df = score_stats_by_kmer(seq_records_gen, gerp_scorer, ['lnc_RNA'], k_values=[1,2,3])
-    # # kmer_base_df = score_stats_by_kmer(seq_records_gen, gerp_scorer, ['five_prime_UTR'], k_values=[1,2,3])
-    # dff = aggregate_over_additive_field(kmer_base_df, ['ft_len', 'phase','ft_start'])
-    #
-    # _ = corrcoefs_by_score_count(dff)
-    # _ = diff_stats_by_score_count(dff)
+    # analyze by kmer for CDS (coding sequence) features
+    kmer_base_df = score_stats_by_kmer(seq_records_gen, gerp_scorer, ['CDS'], k_values=[1, 2, 3])
+    # kmer_base_df = score_stats_by_kmer(seq_records_gen, gerp_scorer, ['lnc_RNA'], k_values=[1,2,3])
+    # kmer_base_df = score_stats_by_kmer(seq_records_gen, gerp_scorer, ['five_prime_UTR'], k_values=[1,2,3])
+    dff = aggregate_over_additive_field(kmer_base_df, ['ft_len', 'phase','ft_start'])
 
+    _ = corrcoefs_by_score_count(dff)
+    _ = diff_stats_by_score_count(dff)
+
+    """Dilated"""
     # analyze by dilated kmer for CDS (coding sequence) features
     kmer_base_df_cds = score_stats_by_dilated_kmer(seq_records_gen, gerp_scorer, ['CDS'], k_values=(1, 2,), dilations=range(1,20))
     # df_out_cds, df2 = mutual_information_by_dilation(kmer_base_df_cds)
     df_summary = mutual_information_by_dilation(kmer_base_df_cds)
     plot_mutual_information(df_summary, title_prefix='cds_grp')
+    # plot_mutual_information(df_summary, title_prefix='cds_grp', y_fields=('I',))
+    # Note: difference is between separating the monomer prob or not
 
     # # analyze by dilated kmer for genes features
     # kmer_base_df_gene = score_stats_by_dilated_kmer(seq_records_gen, gerp_scorer, ['gene'], k_values=(1, 2,), dilations=range(1,20))
