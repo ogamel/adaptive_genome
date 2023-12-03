@@ -13,7 +13,7 @@ from Bio.SeqRecord import SeqRecord
 from Bio.Data.CodonTable import standard_dna_table
 
 from genetic import get_feature_briefs
-from util import periodic_logging, rd, std_to_std_of_mean
+from util import periodic_logging, rd, std_to_std_of_mean, std_to_std_of_sum
 
 ID_COLS = ['k', 'kmer', 'seq_name', 'strand', 'frame', 'pos']
 K_COL, KMER_COL, SEQNAME_COL, STRAND_COL, FRAME_COL, POS_COL = ID_COLS
@@ -309,12 +309,12 @@ def aggregate_over_additive_field(df_in: pd.DataFrame, additive_col: Union[str, 
     Each value of the field generally has different counts, so one must weigh by the counts.
     extra_col: custom column already added to the dataframe, which should be included in the aggregate.
     """
-
     def count_weighted_mean(s: pd.Series):
-        return np.average(s, weights=df_in.loc[s.index, 'count'])
+        return np.average(s, weights=df_in.loc[s.index, COUNT_COL])
 
-    def count_weighted_std(s: pd.Series):
-        return std_to_std_of_mean(s, weights=df_in.loc[s.index, 'count'])
+    def count_summed_std(s: pd.Series):
+        return std_to_std_of_sum(s, mean_array=df_in.loc[s.index, SCORE_MEAN_COL],
+                                 counts_array=df_in.loc[s.index, COUNT_COL])
 
     if type(additive_col) == str:
         additive_col = [additive_col]
@@ -323,11 +323,11 @@ def aggregate_over_additive_field(df_in: pd.DataFrame, additive_col: Union[str, 
         extra_col = [extra_col]
 
     groupby_cols = [col for col in df_in.columns if col in (ID_COLS+extra_col) and col not in additive_col]
-    sort_ascending = [False if col==STRAND_COL else True for col in groupby_cols]
+    sort_ascending = [False if col == STRAND_COL else True for col in groupby_cols]
 
     df_agg = df_in.groupby(groupby_cols, as_index=False).agg(
             **{COUNT_COL: (COUNT_COL, 'sum'), SCORE_MEAN_COL: (SCORE_MEAN_COL, count_weighted_mean),
-             SCORE_STD_COL: (SCORE_STD_COL, count_weighted_std)}).sort_values(by=groupby_cols, ascending=sort_ascending)
+             SCORE_STD_COL: (SCORE_STD_COL, count_summed_std)}).sort_values(by=groupby_cols, ascending=sort_ascending)
     return df_agg
 
 
@@ -353,7 +353,6 @@ def sample_extreme_score_sequences(seq_records_gen: Callable[[], Iterator[SeqRec
     Return sample sequences with extreme score, along with its score, calculated mean on a k-mer.
     Padding on either side.
     """
-
     seq_records = seq_records_gen()
 
     low = high = None  # thresholds to be calculated
