@@ -10,7 +10,7 @@ from Bio.Seq import reverse_complement
 from genetic import kmers_in_rc_order
 from typing import Iterator, Callable, Iterable, Optional
 from score_collation import KMER_COL, COUNT_COL, SCORE_MEAN_COL, SCORE_STD_COL, \
-    K_COL, ID_COLS, POS_COL, FRAME_COL, STRAND_COL, FTLEN_COL, COMPLEMENTED_COLS, aggregate_over_additive_field, \
+    K_COL, ID_COLS, POS_COL, FRAME_COL, STRAND_COL, COMPLEMENTED_COLS, aggregate_over_additive_field, \
     aggregate_over_position
 
 
@@ -36,8 +36,7 @@ def corrcoefs_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, coun
 
     # list to facilitate inverse position and strand sorting in the reverse complement dataframe,
     # e.g. to measure correlation first position in kmer with last in kmer_rc, etc.
-    rc_sort_ascending = [False if col in [POS_COL, STRAND_COL, FTLEN_COL] else True for col in sortby_cols]
-    # rc_sort_ascending = [False if col in [POS_COL, STRAND_COL, FTLEN_COL, FRAME_COL] else True for col in sortby_cols]
+    rc_sort_ascending = [False if col in [POS_COL, STRAND_COL] else True for col in sortby_cols]
 
     print(f'Correlations with columns {sortby_cols}')
 
@@ -94,8 +93,10 @@ def corrcoefs_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, coun
 def diff_stats_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, count_col: str = COUNT_COL,
                               score_col: str = SCORE_MEAN_COL, k_values: list[int] = None):
     """
-    Find pvalues of score and counts of reverse complement kmers being equal, stratified by the ID_FIELDS present in
-    the dataframe and their hardcoded relationships that we test.
+    Find normalized mean square difference of score and counts between kmers and their reverse complement for the
+    discovered complement relationship, as well as for one where each feature column (e.g. strand, frame) is inverted.
+    This tests the validity of the discovered complement relationship, as well as the necessity of each feature column
+    for this to hold.
     Input df is output from score_stats_by_kmer, possibly subsequently further aggregated.
     """
 
@@ -118,7 +119,6 @@ def diff_stats_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, cou
     # list to facilitate inverse position sorting in the reverse complement dataframe,
     # e.g. to measure correlation first position in kmer with last in kmer_rc, etc.
     rc_sort_ascending = [False if col in [POS_COL, STRAND_COL] else True for col in sortby_cols]
-    # rc_sort_ascending = [False if col in [POS_COL, STRAND_COL, FRAME_COL] else True for col in sortby_cols]
 
     for k in k_values:
         df_k = df[df[K_COL] == k]
@@ -155,7 +155,7 @@ def diff_stats_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, cou
                 if inverted_col == POS_COL:
                     # shuffle position in RC, from complement position to +1 (arbitrarily)
                     df_kmer_rc_cp[inverted_col] = (df_kmer_rc_cp[inverted_col] + 1) % k
-                elif inverted_col in [FRAME_COL, FTLEN_COL]:
+                elif inverted_col == FRAME_COL:
                     # shuffle frame in RC, from complement frame to +1 (arbitrarily)
                     df_kmer_rc_cp[inverted_col] = (df_kmer_rc_cp[inverted_col] + 1) % 3
                 elif inverted_col == STRAND_COL:
@@ -188,7 +188,7 @@ def diff_stats_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, cou
                   f'\n\t\t\tCounts: {np.sqrt((df_k[COUNT_DIFF + "_" + inverted_col]**2).mean())/(2 * count_std_k):.4f}. '
                   f'Score: {np.sqrt((df_k[SCORE_DIFF + "_" + inverted_col]**2).mean())/(2 * score_std_k):.4f}.')
 
-    return df  #[np.isfinite(df[COUNT_DIFF])]
+    return df
 
 
 def mutual_information_by_dilation(df_in: pd.DataFrame, do_triple:bool = False) -> pd.DataFrame:
@@ -219,7 +219,8 @@ def mutual_information_by_dilation(df_in: pd.DataFrame, do_triple:bool = False) 
     df1['prob'] = df1[COUNT_COL] / df1.groupby(complemented_cols + ['dil'])[COUNT_COL].transform(sum)
 
     # aggregated by kmer
-    df1_agg = df1[[KMER_COL, COUNT_COL]].groupby([KMER_COL]).aggregate(sum)
+    df1_agg = aggregate_over_additive_field(df1, complemented_cols)
+    # df1_agg = df1[[KMER_COL, COUNT_COL, SCORE_MEAN_COL,]].groupby([KMER_COL]).aggregate(sum)
     df1_agg['prob'] = df1_agg[COUNT_COL] / df1_agg[COUNT_COL].sum()
     df1_agg = df1_agg.reset_index()
 

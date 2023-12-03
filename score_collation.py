@@ -15,9 +15,10 @@ from Bio.Data.CodonTable import standard_dna_table
 from genetic import get_feature_briefs
 from util import periodic_logging, rd, std_to_std_of_mean
 
-ID_COLS = ['k', 'kmer', 'seq_name', 'strand', 'phase', 'ft_start', 'ft_len', 'frame', 'pos']
-K_COL, KMER_COL, SEQNAME_COL, STRAND_COL, PHASE_COL, FTSTART_COL, FTLEN_COL, FRAME_COL, POS_COL = ID_COLS
-COMPLEMENTED_COLS = [STRAND_COL, FRAME_COL, POS_COL, PHASE_COL, FTSTART_COL, FTLEN_COL]
+ID_COLS = ['k', 'kmer', 'seq_name', 'strand', 'frame', 'pos']
+K_COL, KMER_COL, SEQNAME_COL, STRAND_COL, FRAME_COL, POS_COL = ID_COLS
+COMPLEMENTED_COLS = [STRAND_COL, FRAME_COL, POS_COL]
+
 DILATION_COL = 'dil'
 ID_COLS_GAP = [K_COL, KMER_COL, SEQNAME_COL, DILATION_COL, POS_COL]
 VALUE_COLS = ['count', 'score_mean', 'score_std']
@@ -90,7 +91,6 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
     score: function that takes seqname, start and end, returning score values for specified subsequence.
     k_values list[int]: k values to analyze.
     """
-
     seq_records = seq_records_gen()
 
     kmer_data = defaultdict(lambda: np.zeros(3))  # count, sum, sum of squares
@@ -99,7 +99,6 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
         logging.info(f'Sequence {seq_name} ...')
 
         feature_briefs = get_feature_briefs(seq_record, feature_type_filter, merge_overlapping_features=True)
-        # temp_len_list = []
         for i, ft in enumerate(feature_briefs):
             periodic_logging(i, f'Processing feature {i:,}.', v=len(feature_briefs)//10)
 
@@ -109,12 +108,10 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
             if USE_SOFTMASKED:
                 ft_sequence = ft_sequence.upper()
             ft_scores = scorer(seq_name, start, end)
-            ft_start = start % 3
-            ft_len = len(ft_sequence) % 3
+            # ft_start = start % 3
+            # ft_len = len(ft_sequence) % 3
 
-            # temp_len_list.append({'len%3': len(ft_sequence) % 3, 'phase': ft.phase, 'strand': ft.strand})
             for k in k_values:
-
                 # loop through the feature sequence and associated scores, in a window of width k, shifting by one
                 # nucleotide at a time, updating the current kmer, and values with each iteration
                 cur_kmer = ''
@@ -135,30 +132,25 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
                         if len(cur_kmer) < k:
                             continue
 
-                    # frame = (ind - (k-1)) % 3
-                    # ph_len = (ft.phase+ft_len) % 3
                     phase = ft.phase if ft.phase is not None else 0
-                    # print(phase, ft.strand)
 
-                    try:
-                        # ind is the index of the last nucleotide in the kmer.
-                        if ft.strand is None or ft.strand == 1:
-                            frame = (ind - (k-1) - phase) % 3
-                        elif ft.strand == -1:
-                            frame = (len(ft_sequence) - ind - 1 - phase) % 3
-                        else:
-                            frame = (ind - (k - 1)) % 3
-                    except:
-                        print(ft.strand, phase, ft)
+                    # ind is the index of the last nucleotide in the kmer.
+                    if ft.strand is None or ft.strand == 1:
+                        frame = (ind - (k-1) - phase) % 3
+                    elif ft.strand == -1:
+                        frame = (len(ft_sequence) - ind - 1 - phase) % 3
+                    else:
+                        frame = (ind - (k - 1)) % 3
 
                     # track running count, sum, and sum of squares
                     for pos in range(k):
-                        kmer_data[(k, cur_kmer, seq_name, ft.strand, phase, ft_start, ft_len, frame, pos)] += [1, cur_scores[pos], cur_scores[pos] ** 2]
+                        kmer_data[(k, cur_kmer, seq_name, ft.strand, frame, pos)] += \
+                            [1, cur_scores[pos], cur_scores[pos] ** 2]
 
     # compute overall count, mean and standard deviation
     kmer_data_agg = []
     for key, sums in kmer_data.items():
-        k, cur_kmer, seq_name, strand, phase, ft_start, ft_len, frame, pos = key
+        k, cur_kmer, seq_name, strand, frame, pos = key
         s0, s1, s2 = sums
         kmer_data_agg.append(
             {
@@ -166,9 +158,6 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
                 KMER_COL: cur_kmer,
                 SEQNAME_COL: seq_name,
                 STRAND_COL: strand,
-                PHASE_COL: phase,
-                FTSTART_COL: ft_start,
-                FTLEN_COL: ft_len,
                 FRAME_COL: frame,
                 POS_COL: pos,
                 COUNT_COL: int(s0),
@@ -180,16 +169,14 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
     kmer_base_df = pd.DataFrame(kmer_data_agg)
 
     # sort
-    sortby_cols = [K_COL, KMER_COL, SEQNAME_COL, STRAND_COL, PHASE_COL, FTSTART_COL, FTLEN_COL, FRAME_COL]
-    sort_ascending = [False if col==STRAND_COL else True for col in sortby_cols]
+    sortby_cols = [K_COL, KMER_COL, SEQNAME_COL, STRAND_COL, FRAME_COL, POS_COL]
+    sort_ascending = [False if col == STRAND_COL else True for col in sortby_cols]
     kmer_base_df = kmer_base_df.sort_values(by=sortby_cols, ascending=sort_ascending).reset_index(drop=True)
 
     logging.info(f'Computed score stats by k-mer, on {len(kmer_base_df)} k-mer outputs, '
                  f'for {feature_type_filter} feature types.')
 
-    # temp_df = pd.DataFrame(temp_len_list)
-    # temp_df = temp_df.groupby(temp_df.columns.tolist(),as_index=False).size()
-    return kmer_base_df  # , temp_df
+    return kmer_base_df
 
 
 def score_stats_by_dilated_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
@@ -204,7 +191,6 @@ def score_stats_by_dilated_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord
     score: function that takes seqname, start and end, returning score values for specified subsequence.
     k_values Iterable[int]: k values to analyze.
     """
-
     def update_kmer_data(kmer_data, sequence, scores, strand, phase):
         """Mutates kmer_data dictionary to add the information in the input sequence."""
 
@@ -212,21 +198,18 @@ def score_stats_by_dilated_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord
             for dilation in dilations:
                 for ind in range(len(sequence) - k * dilation):
                     cur_kmer = ''.join([sequence[j] for j in range(ind, ind + k * dilation, dilation)])
-                    cur_scores = scores[ind:ind + k * dilation:dilation]
+                    cur_scores = scores[ind: ind + k * dilation:dilation]
 
                     if any(np.isnan(cur_scores)) or (set(cur_kmer) - NUCLEOTIDES):
                         continue
 
-                    try:
-                        # ind is the index of the first nucleotide in the dilated kmer.
-                        if strand == 1:
-                            frame = (ind - phase) % 3
-                        elif ft.strand == -1:
-                            frame = (len(sequence) - (ind + (k-1) * dilation) - 1 - phase) % 3
-                        else:
-                            frame = ind % 3
-                    except:
-                        print(strand, phase, ft)
+                    # ind is the index of the first nucleotide in the dilated kmer.
+                    if strand == 1:
+                        frame = (ind - phase) % 3
+                    elif ft.strand == -1:
+                        frame = (len(sequence) - (ind + (k-1) * dilation) - 1 - phase) % 3
+                    else:
+                        frame = ind % 3
 
                     # track running count, sum, and sum of squares
                     for pos in range(k):
@@ -361,11 +344,6 @@ def aggregate_over_seq_name(df_in: pd.DataFrame):
 def aggregate_over_strand(df_in: pd.DataFrame):
     """Aggregate over strand, which is an additive column field."""
     return aggregate_over_additive_field(df_in, STRAND_COL)
-
-
-def aggregate_over_phase(df_in: pd.DataFrame):
-    """Aggregate over phase, which is an additive column field."""
-    return aggregate_over_additive_field(df_in, PHASE_COL)
 
 
 def sample_extreme_score_sequences(seq_records_gen: Callable[[], Iterator[SeqRecord]],
