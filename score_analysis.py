@@ -9,7 +9,7 @@ from Bio.Seq import reverse_complement
 
 from genetic import kmers_in_rc_order
 from typing import Iterator, Callable, Iterable, Optional
-from score_collation import KMER_COL, COUNT_COL, SCORE_MEAN_COL, SCORE_STD_COL, \
+from score_collation import KMER_COL, COUNT_COL, SCORE_MEAN_COL, SCORE_STD_COL, DILATION_COL, \
     K_COL, ID_COLS, POS_COL, FRAME_COL, STRAND_COL, COMPLEMENTED_COLS, aggregate_over_additive_field, \
     aggregate_over_position
 
@@ -213,69 +213,93 @@ def mutual_information_by_dilation(df_in: pd.DataFrame, do_triple:bool = False) 
 
     # columns we will group the probabilities by - usually strand and frame
     complemented_cols = [col for col in COMPLEMENTED_COLS if col in df_in.columns and col != POS_COL]
+    PAIR_PROB_COL = 'pair_prob'
+    SINGLE_PROB_COL = 'sgl_prob'
+    SINGLE_SCORE_COL = 'sgl_score'
 
     """Mono-nucleotide probabilities"""
     df1 = df_in[(df_in.k == 1)].copy()
-    df1['prob'] = df1[COUNT_COL] / df1.groupby(complemented_cols + ['dil'])[COUNT_COL].transform(sum)
+    df1[SINGLE_PROB_COL] = df1[COUNT_COL] / df1.groupby(complemented_cols + [DILATION_COL])[COUNT_COL].transform(sum)
 
     # aggregated by kmer
     df1_agg = aggregate_over_additive_field(df1, complemented_cols)
     # df1_agg = df1[[KMER_COL, COUNT_COL, SCORE_MEAN_COL,]].groupby([KMER_COL]).aggregate(sum)
-    df1_agg['prob'] = df1_agg[COUNT_COL] / df1_agg[COUNT_COL].sum()
+    df1_agg[SINGLE_PROB_COL] = df1_agg[COUNT_COL] / df1_agg[COUNT_COL].sum()
     df1_agg = df1_agg.reset_index()
 
     # entropy contribution per mononucleotide
-    df1['prob_h'] = - df1['prob']*np.log(df1['prob'])
+    df1['prob_h'] = - df1[SINGLE_PROB_COL]*np.log(df1[SINGLE_PROB_COL])
 
-    # mutual information normalization factor for each strand and frame value, to get I_norm from I.
-    # seems unnecessary to separate them by strand and value as the factors are all very close.
-    df_norm_factor = df1[complemented_cols + ['prob_h']].groupby(complemented_cols).agg(sum)
+    # normalization factors
+    # # mutual information normalization factor for each strand and frame value, to get I_norm from I.
+    # # seems unnecessary to separate them by strand and value as the factors are all very close.
+    # df_norm_factor = df1[complemented_cols + ['prob_h']].groupby(complemented_cols).agg(sum)
+    I_norm_factor = (- df1_agg[SINGLE_PROB_COL] * np.log(df1_agg[SINGLE_PROB_COL])).sum()
+    score_rms_norm_factor = df1[SCORE_MEAN_COL].std()
 
-    # function to return mono-nucleotide probability, as a function of strand and frame
-    def single_prob(kmer, s=None, f=None):
+    # function to return column value (e.g. probability) of a mono-nucleotide, as a function of strand and frame
+    def _single_col(kmer, col, s=None, f=None):
         if s is None or f is None:
-            return df1_agg[(df1_agg[KMER_COL] == kmer)]['prob'].values[0]
+            return df1_agg[(df1_agg[KMER_COL] == kmer)][col].values[0]
         else:
-            return df1[(df1[KMER_COL] == kmer) & (df1[STRAND_COL] == s) & (df1[FRAME_COL] == f)]['prob'].values[0]
+            return df1[(df1[KMER_COL] == kmer) & (df1[STRAND_COL] == s) & (df1[FRAME_COL] == f)][col].values[0]
+
+    def single_prob(kmer, s=None, f=None):
+        return _single_col(kmer, SINGLE_PROB_COL, s, f)
+
+    def single_score(kmer, s=None, f=None):
+        return _single_col(kmer, SCORE_MEAN_COL, s, f)
 
     """Dilated dimer probabilities."""
-    df_kmer = df_in[(df_in.k == 2) & (df_in.pos == 0)].copy()
-    df_kmer['prob'] = df_kmer[COUNT_COL] / df_kmer.groupby(complemented_cols + ['dil'])[COUNT_COL].transform(sum)
+    df_kmer = df_in[(df_in.k == 2)].reset_index(drop=True).copy()
+    # pair probability saved in the pos == 0 row
+    df_kmer[PAIR_PROB_COL] = df_kmer[COUNT_COL] / df_kmer[df_kmer.pos == 0].groupby(complemented_cols +
+                                                                              [DILATION_COL])[COUNT_COL].transform(sum)
 
-    # probabilities of each base pair in the 2-mer
-    # frame in the second base has a different frame, depending on strand and dilation
-    df_kmer['prob_pos0'] = df_kmer.apply(
-        lambda x: single_prob(x[KMER_COL][0], x[STRAND_COL], (x[FRAME_COL] + (x[STRAND_COL]==-1)*x['dil']) % 3), axis=1)
-    df_kmer['prob_pos1'] = df_kmer.apply(
-        lambda x: single_prob(x[KMER_COL][1], x[STRAND_COL], (x[FRAME_COL] + (x[STRAND_COL]==1)*x['dil']) % 3), axis=1)
-    # df_kmer['prob_pos0'] = df_kmer.apply(
-    #     lambda x: single_prob(x[KMER_COL][0]), axis=1)
-    # df_kmer['prob_pos1'] = df_kmer.apply(
-    #     lambda x: single_prob(x[KMER_COL][1]), axis=1)
+    # add dilation to the frame if (pos==1 and strand==1) or (pos==0 and strand==-1). i.e. 2*pos - strand == 1
+    df_kmer[SINGLE_PROB_COL] = df_kmer.apply(lambda x: single_prob(x[KMER_COL][x[POS_COL]], x[STRAND_COL],
+                                (x[FRAME_COL] + ((2 * x[POS_COL] - x[STRAND_COL]) == 1) * x[DILATION_COL]) % 3), axis=1)
+    df_kmer[SINGLE_SCORE_COL] = df_kmer.apply(lambda x: single_score(x[KMER_COL][x[POS_COL]], x[STRAND_COL],
+                                (x[FRAME_COL] + ((2 * x[POS_COL] - x[STRAND_COL]) == 1) * x[DILATION_COL]) % 3), axis=1)
 
     # mutual information
-    df_kmer['I'] = (df_kmer.prob * np.log(df_kmer.prob / (df_kmer.prob_pos0 * df_kmer.prob_pos1)))
+    df_kmer['I'] = (df_kmer[PAIR_PROB_COL] * np.log(df_kmer[PAIR_PROB_COL] /
+                    (df_kmer[df_kmer.pos == 0][SINGLE_PROB_COL] * df_kmer[df_kmer.pos == 1][SINGLE_PROB_COL].values)))
     # simplify with mean, equivalent to not splitting by complemented_cols in the first place
-    df_kmer['I_norm'] = df_kmer['I'] / df_norm_factor['prob_h'].mean()
+    df_kmer['I_norm'] = df_kmer['I'] / I_norm_factor
     # Note: can define this with separate normalization factor for each strand and frame, but not much difference
 
-    """Dilated dimer probabilities, aggregated by kmer."""
-    df_kmer_agg = df_kmer[[K_COL, KMER_COL, 'dil', COUNT_COL]].groupby([K_COL, KMER_COL, 'dil']).aggregate(sum)
-    df_kmer_agg['prob'] = df_kmer_agg[COUNT_COL] / df_kmer_agg.groupby(['dil'])[COUNT_COL].transform(sum)
-    df_kmer_agg = df_kmer_agg.reset_index()
+    # mean square score diff
+    df_kmer['score_msd'] = (df_kmer[SCORE_MEAN_COL] - df_kmer[SINGLE_SCORE_COL]) ** 2
 
-    # probabilities of each base pair in the 2-mer
-    df_kmer_agg['prob_pos0'] = df_kmer_agg[KMER_COL].str[0].map(single_prob)
-    df_kmer_agg['prob_pos1'] = df_kmer_agg[KMER_COL].str[1].map(single_prob)
+    """Dilated dimer probabilities, aggregated over strand and frame, by kmer."""
+    df_kmer_agg = aggregate_over_additive_field(df_kmer, [STRAND_COL, FRAME_COL], extra_col='dil')
+    df_kmer_agg[PAIR_PROB_COL] = df_kmer_agg[COUNT_COL] / df_kmer_agg[df_kmer_agg.pos == 0].groupby(
+                                                                              [DILATION_COL])[COUNT_COL].transform(sum)
+    df_kmer_agg[SINGLE_PROB_COL] = df_kmer_agg.apply(lambda x: single_prob(x[KMER_COL][x[POS_COL]]), axis=1)
+    df_kmer_agg[SINGLE_SCORE_COL] = df_kmer_agg.apply(lambda x: single_score(x[KMER_COL][x[POS_COL]]), axis=1)
 
     # mutual information
-    df_kmer_agg['I'] = (df_kmer_agg.prob * np.log(df_kmer_agg.prob / (df_kmer_agg.prob_pos0 * df_kmer_agg.prob_pos1)))
-    df_kmer_agg['I_norm'] = df_kmer_agg['I'] / (- df1_agg.prob * np.log(df1_agg.prob)).sum()
+    df_kmer_agg['I'] = (df_kmer_agg[PAIR_PROB_COL] * np.log(df_kmer_agg[PAIR_PROB_COL] /
+                            (df_kmer_agg[df_kmer_agg.pos == 0][SINGLE_PROB_COL] *
+                             df_kmer_agg[df_kmer_agg.pos == 1][SINGLE_PROB_COL].values)))
+    df_kmer_agg['I_norm'] = df_kmer_agg['I'] / I_norm_factor
+
+    # mean square score diff
+    df_kmer_agg['score_msd'] = (df_kmer_agg[SCORE_MEAN_COL] - df_kmer_agg[SINGLE_SCORE_COL]) ** 2
 
     """Summary dataframes."""
-    df_summary = df_kmer[['k', 'dil'] + complemented_cols + ['I', 'I_norm']].groupby(['k', 'dil'] + complemented_cols)\
-        .aggregate(sum).reset_index()
-    df_summary_agg = df_kmer_agg[['k', 'dil', 'I', 'I_norm']].groupby(['k', 'dil']).aggregate(sum).reset_index()
+    df_summary = df_kmer[['k', DILATION_COL] + complemented_cols + ['I', 'I_norm', 'score_msd']].groupby(['k',
+        DILATION_COL] + complemented_cols).aggregate({'I': 'sum', 'I_norm': 'sum', 'score_msd': 'mean'}).reset_index()
+    # normalize by std of monomer scores
+    df_summary['score_rms'] = np.sqrt(df_summary['score_msd']) / score_rms_norm_factor
+    df_summary = df_summary.drop(columns='score_msd')
+
+    df_summary_agg = df_kmer_agg[['k', DILATION_COL, 'I', 'I_norm', 'score_msd']].groupby(['k', DILATION_COL])\
+        .aggregate({'I': 'sum', 'I_norm': 'sum', 'score_msd': 'mean'}).reset_index()
+    # normalize by std of monomer scores
+    df_summary_agg['score_rms'] = np.sqrt(df_summary_agg['score_msd']) / score_rms_norm_factor
+    df_summary_agg = df_summary_agg.drop(columns='score_msd')
 
     # add aggregated data to the same dataframe, with empty strand and frame columns.
     df_summary = df_summary.merge(df_summary_agg, how='outer')

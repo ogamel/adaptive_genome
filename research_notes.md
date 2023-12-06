@@ -7,8 +7,10 @@ In doing so, one (i) organizes reasoning and (ii) clarifies questions that will 
 These are then answered through (iii) clean well-documented code, with (iv) clear visuals for each point.
 
 ## Active tasks: 
-- Cleaning up research notes
-- make sure we can discard phase, ft_len, ft_start
+- Make sure we can discard phase, ft_len, ft_start
+- Score correlations of adjacent (or dilated) nucleotides ... 
+  - One of the main and dilation aggregators calculates std dev incorrectly
+
 
 ## Conclusions
 ### Macro
@@ -50,7 +52,7 @@ What does this mean? The above implies kmer is same as itself on either strand, 
 
 Could this all somehow be trivial? No. It shows GERP (variation) is largely a function of kmer. 
 How much? For k=3, std. dev. of all the means across (kmer, strand, frame, pos) tuples is about 1.275, while mean std. 
-dev. within a single tuple is 0.55. So more than half the variation seems to be explained by the tuple? 
+dev. within a single tuple is 2.4. So a good explanation, but most variation is still within a given tuple.
 (TODO: Verify this)
 
 For each kmer, first two codon positions have positive GERP, i.e. don't vary much, and the final one 
@@ -80,22 +82,25 @@ Try outside CDS.
 - 5' UTR: score, strand and pos, (weaker than 3') but not for k=1. count: position
 
 ### Mutual information vs dilation
- - shows the former rises at multiples of 3 nucleotides, in CDS, and doesn't even 
-decrease up to 18. What does that mean? 
+ - Analysis for both score and count probability shows mutual information (or its proxy) rises at multiples of 3 
+nucleotides, in CDS, and doesn't even decrease up to 18. What does that mean? 
 That there is higher correlation with analogous position in downstream codons.
 This is fascinating. SubhanAllah. needs plot by dilated 2-mer... for more clarity
 What does it mean? that on average one can tell something about bps separated by multiple of three, about 1/5 of 
 what one can tell about immediate adjacent. 
-- Can I increase this by looking at some subset? Does it increase for some specific 2-mers?
-- does it depend on the frame, i.e. 1st, 2nd, or 3rd position in codon? I am not combining dilation with frame, 
-  perhaps I should
+ - Can I increase this by looking at some subset? Does it increase for some specific 2-mers?
+ - does it depend on the frame, i.e. 1st, 2nd, or 3rd position in codon? I am not combining dilation with frame, 
+   perhaps I should
 
-Split by strand and frame - get the period of 3. Peak at frame 2, much higher ... which is the most variable 
-nucleotide - this means it also contains the most info the future one ... more than first and second nucleotide ...
-This indicates the choice of the third nucleotide depends choice of third nucleotide in previous codons. 
-While first and second don't depend much - which seems to make sense since this needs to be free to determine the AA
-sequence - perhaps there is another "sequence within a sequence" given in the third nucleotide. 
-But the higher mutual info indicates it is not totally free, a previous one says something about the next
+Split by strand and frame - get the period of 3. Peak at frame 2, for both score and count prob ... this is the most 
+variable nucleotide - this means it also contains the most info the future one ... more than first and second nucleotide
+This indicates the choice of the third nucleotide depends choice of third nucleotide in previous codons, and so does its 
+score. 
+While first and second don't depend much - second a bit dependence more than first - this seems to make sense since this 
+needs to be free to determine the amine acid sequence - perhaps there is another "sequence within a sequence" given in 
+the third nucleotide.
+But the higher mutual info indicates it is not totally free, a previous one says something about the next.
+It seems to me likely that score pattern is a consequence of the probability pattern.
 
 ### Artificial genome
 I did analysis on "artificial genome", creating some random genetic code and reverse translating English text, then
@@ -110,10 +115,15 @@ for k=3 however, as expected, the count is heavily dependent on the frame, with 
 - ft_start - seems irrelevant. Holding all else constant and varying it changes almost nothing. 
 - Sanity check: `dfx = aggregate_over_additive_field(df3, 'kmer')`, passes. combinations with same frame + pos on the 
 same strand have same score mean. 
+- Something doesn't make sense, aggregating over columns that end up being irrelevant, e.g. ft_len, ft_start, makes the 
+the score standard deviations artificially small. Probably because my std combination formula assumes independence, 
+which is clearly incorrect - how to resolve? By taking into account dependence, explicitly .... or by construction 
+calculating the std for every possible aggregation? But is this right? they are supposed to be independent actually 
 
 
 ## Paths Forward
 ### Computations
+- Score correlations of adjacent (or dilated) nucleotides ... 
 - Find smallest averaging window that obeys these symmetries
   - The symmetry even between A and T, as well as a  and t .... presumably masking is region based ... this implies some 
   locality to the origin of the symmetry
@@ -121,7 +131,6 @@ same strand have same score mean.
 - Do within type of subfeatures that appears in the label or feature name (e.g. promoter)
 - Check synonmous codons, do differences in their GERP imply something about prevalence?
 - Check the choice of the third nucleotide in CDS - making its own sequence - based on dilation ... mutual info
-- Score correlations of adjacent nucleotides ... compared with dilation,
 - construct de brun graph with quantities from actual sequences ... measures some kind of robustness under frameshift 
   - for all codons, and translate them... 64 x 4 mtarix ... since only 4 codons could follow another
   - [Frameshift and wild-type proteins are often highly similar because the genetic code and genomes were optimized for 

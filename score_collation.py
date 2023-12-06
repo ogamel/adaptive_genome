@@ -283,19 +283,23 @@ def score_stats_by_dilated_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord
         f'on {num_chunks} random seqeunce chunks of size {chunk_size:,} each.'
 
     logging.info(f'Computed score stats by k-mer, on {len(kmer_base_df)} k-mer outputs, {out_text}')
-    kmer_base_df = kmer_base_df.sort_values(by=[K_COL, KMER_COL, SEQNAME_COL, STRAND_COL, FRAME_COL, POS_COL])
+    kmer_base_df = kmer_base_df.sort_values(by=[K_COL, KMER_COL, SEQNAME_COL, DILATION_COL, STRAND_COL, FRAME_COL, POS_COL])
     kmer_base_df = kmer_base_df.reset_index(drop=True)
 
     return kmer_base_df
 
 
-def aggregate_over_position(df_in: pd.DataFrame):
+def aggregate_over_position(df_in: pd.DataFrame, extra_col: Union[str, List[str]]=''):
     """
     Aggregate over position. That is, combine nucleotide statistics at each position to get a mean statistic for the
     entire k-mer. Each position, by definition, has the same count, so averaging is straightforward.
     Position does not aggregate additively, i.e. one does not add the counts when aggregating.
+    extra_col: custom column already added to the dataframe, which should be included in the aggregate.
     """
-    groupby_cols = [col for col in df_in.columns if col in ID_COLS and col != POS_COL]
+    if type(extra_col) == str:
+        extra_col = [extra_col]
+
+    groupby_cols = [col for col in df_in.columns if col in (ID_COLS+extra_col) and col != POS_COL]
     df_agg = df_in.groupby(groupby_cols, as_index=False).agg(
         **{COUNT_COL: (COUNT_COL, 'first'), SCORE_MEAN_COL: (SCORE_MEAN_COL, 'mean'),
          SCORE_STD_COL: (SCORE_STD_COL, std_to_std_of_mean)})
