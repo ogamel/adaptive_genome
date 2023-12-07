@@ -7,9 +7,6 @@ In doing so, one (i) organizes reasoning and (ii) clarifies questions that will 
 These are then answered through (iii) clean well-documented code, with (iv) clear visuals for each point.
 
 ## Active tasks: 
-- Make sure we can discard phase, ft_len, ft_start
-- Score correlations of adjacent (or dilated) nucleotides ... 
-  - One of the main and dilation aggregators calculates std dev incorrectly
 
 
 ## Conclusions
@@ -100,7 +97,8 @@ While first and second don't depend much - second a bit dependence more than fir
 needs to be free to determine the amine acid sequence - perhaps there is another "sequence within a sequence" given in 
 the third nucleotide.
 But the higher mutual info indicates it is not totally free, a previous one says something about the next.
-It seems to me likely that score pattern is a consequence of the probability pattern.
+It seems to me likely that score pattern is a consequence of the probability pattern. On the other hand, for frame = 2
+the probability is slightly higher is negative strand while score is higher in positive strand.
 
 ### Artificial genome
 I did analysis on "artificial genome", creating some random genetic code and reverse translating English text, then
@@ -123,7 +121,6 @@ calculating the std for every possible aggregation? But is this right? they are 
 
 ## Paths Forward
 ### Computations
-- Score correlations of adjacent (or dilated) nucleotides ... 
 - Find smallest averaging window that obeys these symmetries
   - The symmetry even between A and T, as well as a  and t .... presumably masking is region based ... this implies some 
   locality to the origin of the symmetry
@@ -180,6 +177,8 @@ concepts in the literature, and discover some myself ...fundamentally a data ana
 - Make frame out of 3 for all. 3 is only quantity for which frame is meaningful: done
 - Conduct analysis within different features (CDS, GENE, UTR) - how do frequences or GERP scores change? - done: answers 
 above
+- Score correlations of adjacent (or dilated) nucleotides: similar pattern to score, 3-periodic, especially for frame 2
+
 
 
 ## References

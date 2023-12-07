@@ -4,11 +4,10 @@ Module to analyse the scores output by score_collation.py.
 
 import numpy as np
 import pandas as pd
-from scipy.stats import gmean
 from Bio.Seq import reverse_complement
 
 from genetic import kmers_in_rc_order
-from typing import Iterator, Callable, Iterable, Optional
+from typing import Iterator, Callable, Iterable, Optional, Tuple
 from score_collation import KMER_COL, COUNT_COL, SCORE_MEAN_COL, SCORE_STD_COL, DILATION_COL, \
     K_COL, ID_COLS, POS_COL, FRAME_COL, STRAND_COL, COMPLEMENTED_COLS, aggregate_over_additive_field, \
     aggregate_over_position
@@ -191,7 +190,7 @@ def diff_stats_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, cou
     return df
 
 
-def mutual_information_by_dilation(df_in: pd.DataFrame, do_triple:bool = False) -> pd.DataFrame:
+def mutual_information_by_dilation(df_in: pd.DataFrame, do_triple:bool = False) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Computes mutual information vs dilation. Uses normalized counts of a k-mer among other k-mers with same k as its
     probability.
@@ -306,7 +305,7 @@ def mutual_information_by_dilation(df_in: pd.DataFrame, do_triple:bool = False) 
 
     df_summary[STRAND_COL] = df_summary[STRAND_COL].astype("Int64")
     df_summary[FRAME_COL] = df_summary[FRAME_COL].astype("Int64")
-    return df_summary
+    return df_summary, df_kmer
 
 
 # TODO: compute mutual information of k-mer vs its subwords ... e.g. P(ACC) vs P(A)P(C)P(C) vs P(AC)P(C) vs P(A)P(CC)

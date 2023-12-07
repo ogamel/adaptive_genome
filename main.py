@@ -5,24 +5,26 @@ Conservation score is measured by Genomic Evolutionary Rate Profiling (GERP).
 All data obtained from Ensembl release 109.
 """
 import logging
-from importlib import reload
-import visuals
-visuals=reload(visuals)
 import score_analysis
 import score_collation
-score_analysis = reload(score_analysis)
-score_collation = reload(score_collation)
-visuals = reload(visuals)
+
 import pandas as pd
 
 from data.load import read_sequence, read_annotation_generator, read_gerp_scorer
 from data.paths import chr17_paths  # paths to source data files
 from data.process import get_train_test_x_y
-from score_collation import score_stats_by_kmer, score_stats_by_dilated_kmer, sample_extreme_score_sequences, aggregate_over_additive_field, score_stats_by_feature_type, aggregate_over_position
+from score_collation import score_stats_by_kmer, score_stats_by_dilated_kmer, sample_extreme_score_sequences, \
+    aggregate_over_additive_field, score_stats_by_feature_type, aggregate_over_position, STRAND_COL
 from score_nn_modeling import LocalWindowModel, ModelTrainer
 from score_analysis import mutual_information_by_dilation, corrcoefs_by_score_count, diff_stats_by_score_count
-from visuals import plot_mutual_information_by_dilation
-from genetic import get_feature_briefs
+from visuals import plot_mutual_information_by_dilation, plot_mutual_information_by_dilation_by_kmer
+from genetic import get_feature_briefs, CODON_FORWARD_TABLE
+
+# from importlib import reload
+# score_analysis = reload(score_analysis)
+# score_collation = reload(score_collation)
+# import visuals
+# visuals = reload(visuals)
 
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -45,25 +47,32 @@ if __name__ == '__main__':
     # get GERP retrieval function, from the BigWig file
     gerp_scorer = read_gerp_scorer(paths.gerp)
 
+    # analyze stats by feature type
     # df= score_stats_by_feature_type(seq_records_gen, gerp_scorer)
 
     """Analysis"""
-    # # analyze by kmer for CDS (coding sequence) features
-    # kmer_base_df = score_stats_by_kmer(seq_records_gen, gerp_scorer, ['CDS'], k_values=[1, 2, 3])
-    # # kmer_base_df = score_stats_by_kmer(seq_records_gen, gerp_scorer, ['lnc_RNA'], k_values=[1,2,3])
-    # # kmer_base_df = score_stats_by_kmer(seq_records_gen, gerp_scorer, ['five_prime_UTR'], k_values=[1,2,3])
-    #
-    # _ = corrcoefs_by_score_count(kmer_base_df)
-    # _ = diff_stats_by_score_count(kmer_base_df)
+    # analyze by kmer for CDS (coding sequence) features
+    kmer_base_df = score_stats_by_kmer(seq_records_gen, gerp_scorer, ['CDS'], k_values=[1, 2, 3])
+    # kmer_base_df = score_stats_by_kmer(seq_records_gen, gerp_scorer, ['lnc_RNA'], k_values=[1,2,3])
+    # kmer_base_df = score_stats_by_kmer(seq_records_gen, gerp_scorer, ['five_prime_UTR'], k_values=[1,2,3])
 
-    """Dilated"""
-    # analyze by dilated kmer for CDS (coding sequence) features
-    kmer_base_df_cds = score_stats_by_dilated_kmer(seq_records_gen, gerp_scorer, ['CDS'], k_values=(1, 2,), dilations=range(1,20))
-    # df_out_cds, df2 = mutual_information_by_dilation(kmer_base_df_cds)
-    df_summary = mutual_information_by_dilation(kmer_base_df_cds)
-    plot_mutual_information_by_dilation(df_summary, title_prefix='cds_grp')
-    # plot_mutual_information_by_dilation(df_summary, title_prefix='cds_grp', y_fields=('I',))
-    # Note: difference is between separating the monomer prob or not
+    _ = corrcoefs_by_score_count(kmer_base_df)
+    _ = diff_stats_by_score_count(kmer_base_df)
+
+    # without strand - we find count correlates here
+    df0 = aggregate_over_additive_field(kmer_base_df, STRAND_COL)
+    _ = corrcoefs_by_score_count(df0)
+    _ = diff_stats_by_score_count(df0)
+
+    """Codons"""
+    df3 = kmer_base_df[kmer_base_df.k==3]
+
+    # """Dilated"""
+    # # analyze by dilated kmer for CDS (coding sequence) features
+    # kmer_base_df_cds = score_stats_by_dilated_kmer(seq_records_gen, gerp_scorer, ['CDS'], k_values=(1, 2,), dilations=range(1,20))
+    # df_summary, df_kmer = mutual_information_by_dilation(kmer_base_df_cds)
+    # plot_mutual_information_by_dilation(df_summary, title_prefix='cds_grp')
+    # plot_mutual_information_by_dilation_by_kmer(df_kmer, title_prefix='cds_grp')
 
     # # analyze by dilated kmer for genes features
     # kmer_base_df_gene = score_stats_by_dilated_kmer(seq_records_gen, gerp_scorer, ['gene'], k_values=(1, 2,), dilations=range(1,20))
