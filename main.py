@@ -66,6 +66,8 @@ if __name__ == '__main__':
 
     """Codons"""
     df3 = kmer_base_df[kmer_base_df.k==3]
+    df3['aa'] = df3.kmer.map(CODON_FORWARD_TABLE)
+    # TODO: print for strand and frame
 
     # """Dilated"""
     # # analyze by dilated kmer for CDS (coding sequence) features

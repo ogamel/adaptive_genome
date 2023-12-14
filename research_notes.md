@@ -100,6 +100,19 @@ But the higher mutual info indicates it is not totally free, a previous one says
 It seems to me likely that score pattern is a consequence of the probability pattern. On the other hand, for frame = 2
 the probability is slightly higher is negative strand while score is higher in positive strand.
 
+### Genetic Code
+Delve into genetic code, whether the symmetries above can shed light on its properties.
+- Found interesting graph between amino acids were edges are reverse complement codons. Get two disconnected graphs, 
+size 7 and 14. The larger can itself is two graphs sizes 8 and 5 connected only by stop codon.
+- But what does that even mean? RC the codon only makes sense if both strands are transcribed. actually no, two 
+connected AAs can mean they have common reverse codons 
+
+- plotted score and count by amino acid, for each frame and strand. Interestingly, 
+- s=1, f=0 real has very few stops. 
+  - stop, M, W have no negative GERP in any codon, very conserved. I understand stop and M (start), but why W? Could it
+  be because it is "surrounded by Stop in the Genetic code?"
+  - stop's last codon is most conserved 
+
 ### Artificial genome
 I did analysis on "artificial genome", creating some random genetic code and reverse translating English text, then
 doing K-mer analysis. As expected, there is no pattern. 2-mers independent of frame - makes sense, because the frame
@@ -142,6 +155,7 @@ to artificial genome.
 - Perhaps non standard genetic code is reflected in the sequences themselves. That code and sequences have to go together 
 to conserve these higher properties.
 - Find nice symmetric order of rc pairs - rather than currently used canonical ordering
+- Whatever properties one explores for genetic code, they could also apply for alternate genetic code - check there
 
 ### Motif language analog
 - Motifs vs GERP score https://en.wikipedia.org/wiki/Sequence_motif (seems I need more detailed annotation)
