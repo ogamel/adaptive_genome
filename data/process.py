@@ -34,7 +34,7 @@ def sequence_to_one_hot_array(sequence: str):
     Returned array is two-dimensional, where each row represents a sequence position, and each column a one hot encoded
     category (i.e. a member of the nucleotide alphabet).
     """
-    return jax.nn.one_hot(jnp.array(list(map(BASE_TO_INT.get, sequence))), N_BASES)
+    return jax.nn.one_hot(jnp.array(list(map(BASE_TO_INT.get, sequence)), dtype=int), N_BASES)
 
 
 # @partial(jax.jit, static_argnums=(1,3))
@@ -105,8 +105,8 @@ def get_train_test_x_y(seq_records_gen: Callable[[], Iterator[SeqRecord]],
 
 
 def process_codon_seq_score(seq_records_gen: Callable[[], Iterator[SeqRecord]],
-                       scorer: Callable[[str, int, int], list[float]], feature_type_filter: list[str],
-                       mode='bases_to_base', y_frame=2, strand=1, max_train_rows=MAX_TRAIN_ROWS):
+                            scorer: Callable[[str, int, int], list[float]], feature_type_filter: list[str],
+                            codon_window=DEFAULT_CODON_WINDOW, strand=1, max_train_rows=MAX_TRAIN_ROWS):
     """
     Build data to be fed into regressor or neural network to predict score based on sequence. NaNs are ignored.
     If y_frame is set, only get y with that frame value. If None, then get everything.
@@ -152,9 +152,9 @@ def process_codon_seq_score(seq_records_gen: Callable[[], Iterator[SeqRecord]],
 
             ft_scores = jnp.array(scorer(seq_name, ft.start + ft.phase, ft.end)).reshape(-1, 1)
 
-            seq_array = sliding_window(sequence_to_one_hot_array(ft_sequence), window=3*DEFAULT_CODON_WINDOW,
+            seq_array = sliding_window(sequence_to_one_hot_array(ft_sequence), window=3*codon_window,
                                        step=3)  # step is one codon
-            score_array = sliding_window(ft_scores, window=3*DEFAULT_CODON_WINDOW, step=3)
+            score_array = sliding_window(ft_scores, window=3*codon_window, step=3)
 
             # remove rows with nan score
             nan_row_indices = jnp.isnan(score_array).any(axis=1)
@@ -179,25 +179,36 @@ def process_codon_seq_score(seq_records_gen: Callable[[], Iterator[SeqRecord]],
     return seq_train, score_train, seq_test, score_test
 
 
-def train_test_x_y_from_seq_score(seq_train, score_train, seq_test, score_test, mode='bases_to_base'):
+def train_test_x_y_from_seq_score(seq_train, score_train, seq_test, score_test, mode='bases_to_base', target_y_frame=2):
     """Return the right train and testt slices of input arrays, which are created by process_codon_seq_score."""
 
     x_train = y_train = x_test = y_test = None
     # choose x and y depending on training mode
     if mode == 'bases_to_base':
-        x_train, y_train = seq_train[:, :-N_BASES], seq_train[:, -N_BASES:]
-        x_test, y_test = seq_test[:, :-N_BASES], seq_test[:, -N_BASES:]
+        x_train, y_train = seq_train[:, :-N_BASES], jnp.argmax(seq_train[:, -N_BASES:], axis=1)
+        x_test, y_test = seq_test[:, :-N_BASES], jnp.argmax(seq_test[:, -N_BASES:], axis=1)
     elif mode == 'bases_to_score':
         x_train, y_train = seq_train, score_train[:, -1]
         x_test, y_test = seq_test, score_test[:, -1]
+    elif mode == 'scores_to_base':
+        x_train, y_train = score_train, jnp.argmax(seq_train[:, -N_BASES:], axis=1)
+        x_test, y_test = score_test, jnp.argmax(seq_test[:, -N_BASES:], axis=1)
     elif mode == 'scores_to_score':
         x_train, y_train = score_train[:, :-1], score_train[:, -1]
         x_test, y_test = score_test[:, :-1], score_test[:, -1]
     elif mode == 'bases+scores_to_base':
-        x_train, y_train = jnp.append(seq_train[:, :-N_BASES], score_train, axis=1), seq_train[:, -N_BASES:]
-        x_test, y_test = jnp.append(seq_test[:, :-N_BASES], score_test, axis=1), seq_test[:, -N_BASES:]
+        x_train, y_train = jnp.append(seq_train[:, :-N_BASES], score_train, axis=1), \
+                           jnp.argmax(seq_train[:, -N_BASES:], axis=1)
+        x_test, y_test = jnp.append(seq_test[:, :-N_BASES], score_test, axis=1), \
+                         jnp.argmax(seq_test[:, -N_BASES:], axis=1)
     elif mode == 'bases+scores_to_score':
         x_train, y_train = jnp.append(seq_train, score_train[:, :-1], axis=1), score_train[:, -1]
         x_test, y_test = jnp.append(seq_test, score_test[:, :-1], axis=1), score_test[:, -1]
+    elif mode == 'trivial_to_base':
+        x_train, y_train = seq_train, jnp.argmax(seq_train[:, -N_BASES:], axis=1)
+        x_test, y_test = seq_test, jnp.argmax(seq_test[:, -N_BASES:], axis=1)
+    elif mode == 'trivial_to_score':
+        x_train, y_train = score_train, score_train[:, -1]
+        x_test, y_test = score_test, score_test[:, -1]
 
     return x_train, y_train, x_test, y_test
