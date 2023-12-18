@@ -113,6 +113,16 @@ connected AAs can mean they have common reverse codons
   be because it is "surrounded by Stop in the Genetic code?"
   - stop's last codon is most conserved 
 
+#### Predict last bp in codon and its score
+- seems just need first two bp in current codon to predict third with 0.46 accuracy. earlier codons add nothing
+hypothesized and found it equivalent to simply knowing the proportions of each codon among those with same first two 
+base pairs. Makes sense, because there is no other information in that one codon 
+  - should try just 1 bp previous?
+- predicting GERP score however seems to be helped by earlier codons, up to three codons
+- bases+scores to score gives best performance
+  - try changing their lengths independently
+
+
 ### Artificial genome
 I did analysis on "artificial genome", creating some random genetic code and reverse translating English text, then
 doing K-mer analysis. As expected, there is no pattern. 2-mers independent of frame - makes sense, because the frame

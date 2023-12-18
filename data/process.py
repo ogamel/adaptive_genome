@@ -6,6 +6,7 @@ from typing import Iterator, Callable
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 from Bio.SeqRecord import SeqRecord
 from sklearn.model_selection import train_test_split
 
@@ -28,6 +29,7 @@ SEED = 200
 USE_SOFTMASKED = True  # flag to whether to use softmasked nucleotides, in small letters e.g. 'gatc'
 MAX_TRAIN_ROWS = 300000
 
+
 def sequence_to_one_hot_array(sequence: str):
     """
     Convert the input sequence string to a jax numpy array based on concatenated one hot encoding of each nucleotide.
@@ -35,6 +37,11 @@ def sequence_to_one_hot_array(sequence: str):
     category (i.e. a member of the nucleotide alphabet).
     """
     return jax.nn.one_hot(jnp.array(list(map(BASE_TO_INT.get, sequence)), dtype=int), N_BASES)
+
+
+def onehot_to_num(input):
+    """Converts array where each row is one hot encoded vector to vector of numbers."""
+    return jnp.argmax(input, axis=1)
 
 
 # @partial(jax.jit, static_argnums=(1,3))
@@ -185,30 +192,36 @@ def train_test_x_y_from_seq_score(seq_train, score_train, seq_test, score_test, 
     x_train = y_train = x_test = y_test = None
     # choose x and y depending on training mode
     if mode == 'bases_to_base':
-        x_train, y_train = seq_train[:, :-N_BASES], jnp.argmax(seq_train[:, -N_BASES:], axis=1)
-        x_test, y_test = seq_test[:, :-N_BASES], jnp.argmax(seq_test[:, -N_BASES:], axis=1)
+        x_train, y_train = seq_train[:, :-N_BASES], onehot_to_num(seq_train[:, -N_BASES:])
+        x_test, y_test = seq_test[:, :-N_BASES], onehot_to_num(seq_test[:, -N_BASES:])
     elif mode == 'bases_to_score':
         x_train, y_train = seq_train, score_train[:, -1]
         x_test, y_test = seq_test, score_test[:, -1]
     elif mode == 'scores_to_base':
-        x_train, y_train = score_train, jnp.argmax(seq_train[:, -N_BASES:], axis=1)
-        x_test, y_test = score_test, jnp.argmax(seq_test[:, -N_BASES:], axis=1)
+        x_train, y_train = score_train, onehot_to_num(seq_train[:, -N_BASES:])
+        x_test, y_test = score_test, onehot_to_num(seq_test[:, -N_BASES:])
     elif mode == 'scores_to_score':
         x_train, y_train = score_train[:, :-1], score_train[:, -1]
         x_test, y_test = score_test[:, :-1], score_test[:, -1]
     elif mode == 'bases+scores_to_base':
         x_train, y_train = jnp.append(seq_train[:, :-N_BASES], score_train, axis=1), \
-                           jnp.argmax(seq_train[:, -N_BASES:], axis=1)
+                           onehot_to_num(seq_train[:, -N_BASES:])
         x_test, y_test = jnp.append(seq_test[:, :-N_BASES], score_test, axis=1), \
-                         jnp.argmax(seq_test[:, -N_BASES:], axis=1)
+                         onehot_to_num(seq_test[:, -N_BASES:])
     elif mode == 'bases+scores_to_score':
         x_train, y_train = jnp.append(seq_train, score_train[:, :-1], axis=1), score_train[:, -1]
         x_test, y_test = jnp.append(seq_test, score_test[:, :-1], axis=1), score_test[:, -1]
-    elif mode == 'trivial_to_base':
-        x_train, y_train = seq_train, jnp.argmax(seq_train[:, -N_BASES:], axis=1)
-        x_test, y_test = seq_test, jnp.argmax(seq_test[:, -N_BASES:], axis=1)
-    elif mode == 'trivial_to_score':
-        x_train, y_train = score_train, score_train[:, -1]
-        x_test, y_test = score_test, score_test[:, -1]
+    elif mode == 'random_to_base':
+        x_train, y_train = np.random.rand(*seq_train.shape), onehot_to_num(seq_train[:, -N_BASES:])
+        x_test, y_test = np.random.rand(*seq_test.shape), onehot_to_num(seq_test[:, -N_BASES:])
+    elif mode == 'random_to_score':
+        x_train, y_train = np.random.rand(*score_train.shape), score_train[:, -1]
+        x_test, y_test = np.random.rand(*score_test.shape), score_test[:, -1]
+    # elif mode == 'trivial_to_base':
+    #     x_train, y_train = seq_train, onehot_to_num(seq_train[:, -N_BASES:])
+    #     x_test, y_test = seq_test, onehot_to_num(seq_test[:, -N_BASES:])
+    # elif mode == 'trivial_to_score':
+    #     x_train, y_train = score_train, score_train[:, -1]
+    #     x_test, y_test = score_test, score_test[:, -1]
 
     return x_train, y_train, x_test, y_test

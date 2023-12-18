@@ -31,13 +31,18 @@ RESIDUE_COL = 'residue'
 FeatureBrief = namedtuple('FeatureBrief', ['seq_name', 'type', 'start', 'end', 'strand', 'phase', 'subfeatures'])
 
 
-def kmers_in_rc_order(k):
+def kmers_list(k, order='rc_complement'):
     """
-    Return all k-mers ordered such that reverse complements are adjacent with self-reverse complements at the beginning.
+    Return all k-mers, where order is in ['alphabetial', 'rc_complement'].
+    rc_complement ordered such that reverse complements are adjacent with self-reverse complements at the beginning.
     """
     # TODO: define and return a canonical order of this, consistent and symmetric for any k
     # Read: https://www.biorxiv.org/content/10.1101/2023.03.09.531845v1.full.pdf
     kmers_set = {''.join(combo) for combo in product(standard_dna_table.nucleotide_alphabet, repeat=k)}
+
+    if order == 'alphabetical':
+        return sorted(list(kmers_set))
+
     kmers_list = []
     while kmers_set:
         kmer = kmers_set.pop()

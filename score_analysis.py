@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from Bio.Seq import reverse_complement
 
-from genetic import kmers_in_rc_order
+from genetic import kmers_list
 from typing import Iterator, Callable, Iterable, Optional, Tuple
 from score_collation import KMER_COL, COUNT_COL, SCORE_MEAN_COL, SCORE_STD_COL, DILATION_COL, \
     K_COL, ID_COLS, POS_COL, FRAME_COL, STRAND_COL, COMPLEMENTED_COLS, aggregate_over_additive_field, \
@@ -50,7 +50,7 @@ def corrcoefs_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, coun
         rc_pairwise_counts = [[], []]
         rc_pairwise_scores = [[], []]
 
-        kmers_set = set(kmers_in_rc_order(k))
+        kmers_set = set(kmers_list(k))
         while kmers_set:
             kmer = kmers_set.pop()
             kmer_rc = reverse_complement(kmer)
@@ -122,7 +122,7 @@ def diff_stats_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, cou
     for k in k_values:
         df_k = df[df[K_COL] == k]
 
-        kmers_set = set(kmers_in_rc_order(k))
+        kmers_set = set(kmers_list(k))
         while kmers_set:
             kmer = kmers_set.pop()
             kmer_rc = reverse_complement(kmer)

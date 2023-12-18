@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from matplotlib import gridspec, colormaps
 
-from genetic import kmers_in_rc_order
+from genetic import kmers_list
 from score_collation import K_COL, KMER_COL, COUNT_COL, SCORE_MEAN_COL, POS_COL, STRAND_COL, FRAME_COL, DILATION_COL
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -41,7 +41,7 @@ def plot_stat_by_col(df: pd.DataFrame, x_col: str = KMER_COL, count_col: str = C
         df_k = df[df[K_COL] == k]
         if x_col == KMER_COL:
             # sort such that reverse complement k-mers are adjacent
-            kmers = kmers_in_rc_order(k)
+            kmers = kmers_list(k)
             df_k = df_k[df_k[x_col].isin(kmers)]
             df_k = df_k.sort_values(by=x_col, key=lambda column: column.map(lambda e: kmers.index(e)))
 
