@@ -7,7 +7,7 @@ In doing so, one (i) organizes reasoning and (ii) clarifies questions that will 
 These are then answered through (iii) clean well-documented code, with (iv) clear visuals for each point.
 
 ## Active tasks: 
-
+- Read GERP Paper
 
 ## Conclusions
 ### Macro
@@ -117,11 +117,17 @@ connected AAs can mean they have common reverse codons
 - seems just need first two bp in current codon to predict third with 0.46 accuracy. earlier codons add nothing
 hypothesized and found it equivalent to simply knowing the proportions of each codon among those with same first two 
 base pairs. Makes sense, because there is no other information in that one codon 
+  - Last base in most prevalent codon is always G or C 
   - should try just 1 bp previous?
 - predicting GERP score however seems to be helped by earlier codons, up to three codons
 - bases+scores to score gives best performance
   - try changing their lengths independently
-
+  
+#### Codon prevalence and GERP
+Generally rarer codon has lower GERP. true within a family of synonmous codons for last position - not clear further 
+pattern.
+Seems codon bias affecting expression is known in literature, as is 
+[GERP variability](https://www.biorxiv.org/content/10.1101/688051v1.full).
 
 ### Artificial genome
 I did analysis on "artificial genome", creating some random genetic code and reverse translating English text, then
@@ -144,13 +150,13 @@ calculating the std for every possible aggregation? But is this right? they are 
 
 ## Paths Forward
 ### Computations
+- Split input k-fold, check how different the computed values are - I am especially interested in frames 1 and 2, which 
+depend on how codons are used together.
 - Find smallest averaging window that obeys these symmetries
   - The symmetry even between A and T, as well as a  and t .... presumably masking is region based ... this implies some 
   locality to the origin of the symmetry
 - Do analysis within single feature - CDS, gene. E.g. kmer and its RC within same CDS
 - Do within type of subfeatures that appears in the label or feature name (e.g. promoter)
-- Check synonmous codons, do differences in their GERP imply something about prevalence?
-- Check the choice of the third nucleotide in CDS - making its own sequence - based on dilation ... mutual info
 - construct de brun graph with quantities from actual sequences ... measures some kind of robustness under frameshift 
   - for all codons, and translate them... 64 x 4 mtarix ... since only 4 codons could follow another
   - [Frameshift and wild-type proteins are often highly similar because the genetic code and genomes were optimized for 
@@ -202,6 +208,9 @@ concepts in the literature, and discover some myself ...fundamentally a data ana
 - Conduct analysis within different features (CDS, GENE, UTR) - how do frequences or GERP scores change? - done: answers 
 above
 - Score correlations of adjacent (or dilated) nucleotides: similar pattern to score, 3-periodic, especially for frame 2
+- Check the choice of the third nucleotide in CDS - making its own sequence - based on dilation ... mutual info
+- Check synonmous codons, do differences in their GERP imply something about prevalence? yes, rarer have lower GERP in 
+  pos 2.
 
 
 

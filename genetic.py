@@ -28,7 +28,7 @@ RESIDUE_COL = 'residue'
 
 
 # summary of key feature properties
-FeatureBrief = namedtuple('FeatureBrief', ['seq_name', 'type', 'start', 'end', 'strand', 'phase', 'subfeatures'])
+FeatureBrief = namedtuple('FeatureBrief', ['seq_name', 'type', 'id', 'start', 'end', 'strand', 'phase', 'subfeatures'])
 
 
 def kmers_list(k, order='rc_complement'):
@@ -120,7 +120,7 @@ def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: lis
         if not feature_type_filter or feature.type in feature_type_filter:
             feature_ct += 1
             phase = int(feature.qualifiers['phase'][0]) if 'phase' in feature.qualifiers else None
-            filtered_feature = FeatureBrief(seq_name=seq_record.name, type=feature.type,
+            filtered_feature = FeatureBrief(seq_name=seq_record.name, type=feature.type, id=feature.id,
                                             start=feature.location.start.position, end=feature.location.end.position,
                                             strand=feature.strand, phase=phase,
                                             subfeatures=len(feature.sub_features))
@@ -135,7 +135,7 @@ def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: lis
     for ft_type, ft_list in filtered_features_dict.items():
         ft_merged_list = []
         merged_start, merged_end, merged_subfeatures = ft_list[0].start, ft_list[0].end, ft_list[0].subfeatures
-        merged_strand, merged_phase = ft_list[0].strand, ft_list[0].phase
+        merged_strand, merged_phase, merged_id = ft_list[0].strand, ft_list[0].phase, ft_list[0].id
         for ft in ft_list[1:]:
             if (not merge_overlapping_features) or ft.start > merged_end + 1 or \
                     (not merge_opposite_strands and ft.strand != merged_strand):  # do not merge
@@ -144,16 +144,18 @@ def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: lis
                 # 2. Features don't overlap.
                 # 3. Features overlap from opposite strands and merge_opposite_strands is False
 
-                merged_feature = FeatureBrief(seq_name=seq_record.name, type=ft_type, start=merged_start,
-                                              end=merged_end, strand=merged_strand, phase=merged_phase,
-                                              subfeatures=merged_subfeatures)
+                merged_feature = FeatureBrief(seq_name=seq_record.name, type=ft_type, id=merged_id,
+                                              start=merged_start, end=merged_end, strand=merged_strand,
+                                              phase=merged_phase, subfeatures=merged_subfeatures)
                 ft_merged_list.append(merged_feature)  # append previous feature
+                # load current feature properties going forward
                 merged_start, merged_end, merged_subfeatures = ft.start, ft.end, ft.subfeatures
-                merged_strand, merged_phase = ft.strand, ft.phase
+                merged_strand, merged_phase, merged_id = ft.strand, ft.phase, ft.id
             else:  # adjacent or overlapping feature
                 # merged_start is that of the first feature
                 merged_end = ft.end
                 merged_subfeatures += ft.subfeatures
+                merged_id += ' ' + ft.id
                 if ft.strand == merged_strand:  # adjacent or overlapping feature with same strand
                     # merged_strand is that of the first feature
                     # merged_phase is of the first feature for +1 strand, last feature for -1 strand
@@ -165,8 +167,9 @@ def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: lis
                     merged_strand = 0  # strand meaningless
 
         # final feature
-        merged_feature = FeatureBrief(seq_name=seq_record.name, type=ft_type, start=merged_start, end=merged_end,
-                                      strand=merged_strand, phase=merged_phase, subfeatures=merged_subfeatures)
+        merged_feature = FeatureBrief(seq_name=seq_record.name, type=ft_type, id=merged_id, start=merged_start,
+                                      end=merged_end, strand=merged_strand, phase=merged_phase,
+                                      subfeatures=merged_subfeatures)
         ft_merged_list.append(merged_feature)
 
         filtered_ct += len(ft_list)
