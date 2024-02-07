@@ -126,7 +126,10 @@ def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: lis
                                             subfeatures=len(feature.sub_features))
             filtered_features_dict[feature.type].append(filtered_feature)
 
-    filtered_features_dict = {ft_type: sorted(list(set(ft_list))) for ft_type, ft_list in filtered_features_dict.items()}
+    # sort the features by start position
+    for ft_type in filtered_features_dict.keys():
+        filtered_features_dict[ft_type].sort(key=lambda x: x.start)
+    # filtered_features_dict = {ft_type: sorted(list(set(ft_list))) for ft_type, ft_list in filtered_features_dict.items()}
 
     # merge overlapping features on the same strand
 

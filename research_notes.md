@@ -7,7 +7,9 @@ In doing so, one (i) organizes reasoning and (ii) clarifies questions that will 
 These are then answered through (iii) clean well-documented code, with (iv) clear visuals for each point.
 
 ## Active tasks: 
-- Read GERP Paper
+- Clean up code and codify discoveries
+- Add feature to prediction model - by getting details on the protein coded (e.g. ENSP00000007708)
+- Get protein family annotations, check GERP relation between them
 
 ## Conclusions
 ### Macro
@@ -105,7 +107,7 @@ Delve into genetic code, whether the symmetries above can shed light on its prop
 - Found interesting graph between amino acids were edges are reverse complement codons. Get two disconnected graphs, 
 size 7 and 14. The larger can itself is two graphs sizes 8 and 5 connected only by stop codon.
 - But what does that even mean? RC the codon only makes sense if both strands are transcribed. actually no, two 
-connected AAs can mean they have common reverse codons 
+connected amino acids can mean they have common reverse codons 
 
 - plotted score and count by amino acid, for each frame and strand. Interestingly, 
 - s=1, f=0 real has very few stops. 
@@ -119,9 +121,10 @@ hypothesized and found it equivalent to simply knowing the proportions of each c
 base pairs. Makes sense, because there is no other information in that one codon 
   - Last base in most prevalent codon is always G or C 
   - should try just 1 bp previous?
-- predicting GERP score however seems to be helped by earlier codons, up to three codons
-- bases+scores to score gives best performance
+- predicting GERP score however seems to be helped by earlier codons, up to three codons, get 13% 
+- bases+scores to score gives best performance 27% R^2
   - try changing their lengths independently
+- All this is local effect, previous codons. What if I look into nonlocal effects. Can I boost the 13%/27%?
   
 #### Codon prevalence and GERP
 Generally rarer codon has lower GERP. true within a family of synonmous codons for last position - not clear further 
@@ -146,7 +149,8 @@ same strand have same score mean.
 the score standard deviations artificially small. Probably because my std combination formula assumes independence, 
 which is clearly incorrect - how to resolve? By taking into account dependence, explicitly .... or by construction 
 calculating the std for every possible aggregation? But is this right? they are supposed to be independent actually 
-
+- Read GERP Paper
+- 
 
 ## Paths Forward
 ### Computations
@@ -158,7 +162,7 @@ depend on how codons are used together.
 - Do analysis within single feature - CDS, gene. E.g. kmer and its RC within same CDS
 - Do within type of subfeatures that appears in the label or feature name (e.g. promoter)
 - construct de brun graph with quantities from actual sequences ... measures some kind of robustness under frameshift 
-  - for all codons, and translate them... 64 x 4 mtarix ... since only 4 codons could follow another
+  - for all codons, and translate them... 64 x 4 matrix ... since only 4 codons could follow another
   - [Frameshift and wild-type proteins are often highly similar because the genetic code and genomes were optimized for 
      frameshift tolerance](https://bmcgenomics.biomedcentral.com/articles/10.1186/s12864-022-08435-6)
 - Seems rarer codons are more variable between species ... find interpretation and meaning of this
@@ -195,6 +199,7 @@ concepts in the literature, and discover some myself ...fundamentally a data ana
     does one k-mer tend to turn to another like CG becomes ...? 
     does that depend on region type? would be very interesting if so - and show it is a complex genetic function, not 
     just innate local tendency depending on conditions
+    Would I need a dataset within a given species but in different conditions?
 
 
 ## Paths completed
@@ -211,7 +216,6 @@ above
 - Check the choice of the third nucleotide in CDS - making its own sequence - based on dilation ... mutual info
 - Check synonmous codons, do differences in their GERP imply something about prevalence? yes, rarer have lower GERP in 
   pos 2.
-
 
 
 ## References

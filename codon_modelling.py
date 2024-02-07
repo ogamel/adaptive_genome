@@ -57,8 +57,8 @@ if __name__ == '__main__':
     ml_models = {}
     out_scores = {}  # defaultdict(list)
 
-    modes = ['bases_to_base', 'bases_to_score', 'scores_to_base', 'scores_to_score', 'bases+scores_to_base',
-             'bases+scores_to_score']  # 'bases_trivial', 'scores_trivial']
+    modes = ['bases_to_base', 'scores_to_base', 'bases+scores_to_base',
+             'bases_to_score', 'scores_to_score', 'bases+scores_to_score']  # 'bases_trivial', 'scores_trivial']
     for mode in modes:
         ml_models[mode] = []
         out_scores[mode] = {'train': [], 'test': []}
