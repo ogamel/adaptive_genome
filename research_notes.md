@@ -8,7 +8,7 @@ These are then answered through (iii) clean well-documented code, with (iv) clea
 
 ## Active tasks: 
 - Clean up code and codify discoveries
-- Add feature to prediction model - by getting details on the protein coded (e.g. ENSP00000007708)
+- Add feature to prediction model - by getting details on the protein coded (e.g. ENSP00000007708) - feature enrich
 - Get protein family annotations, check GERP relation between them
 
 ## Conclusions

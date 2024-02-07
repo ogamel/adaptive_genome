@@ -93,7 +93,7 @@ if __name__ == '__main__':
             logging.info(f'Mode: {mode}. Window: {codon_window-c}. Train {score_name}: {train_score:.3f}.  '
                          f'Test {score_name}: {test_score:.3f}.')
 
-            ml_models.append(model)
+            ml_models[mode].append(model)
 
     for mode in modes:
         train_score_str = "\t".join((str(rd(x)) for x in out_scores[mode]["train"]))
