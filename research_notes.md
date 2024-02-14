@@ -10,7 +10,7 @@ These are then answered through (iii) clean well-documented code, with (iv) clea
 - Clean up code and codify discoveries
 - Add feature to prediction model - by getting details on the protein coded (e.g. ENSP00000007708) - feature enrich
 - Get protein family annotations, check GERP relation between them
-
+ENSP00000471646 ENSP00000482950 ENSP00000513293 ENSP00000319210 ENSP00000479485 ENSP00000328977
 ## Conclusions
 ### Macro
 - GERP Analysis by feature type
@@ -116,13 +116,13 @@ connected amino acids can mean they have common reverse codons
   - stop's last codon is most conserved 
 
 #### Predict last bp in codon and its score
-- seems just need first two bp in current codon to predict third with 0.46 accuracy. earlier codons add nothing
+- seems just need first two bp in current codon to predict third with 0.476 accuracy. earlier codons add nothing
 hypothesized and found it equivalent to simply knowing the proportions of each codon among those with same first two 
 base pairs. Makes sense, because there is no other information in that one codon 
   - Last base in most prevalent codon is always G or C 
   - should try just 1 bp previous?
 - predicting GERP score however seems to be helped by earlier codons, up to three codons, get 13% 
-- bases+scores to score gives best performance 27% R^2
+- bases+scores to score gives best performance 26% R^2
   - try changing their lengths independently
 - All this is local effect, previous codons. What if I look into nonlocal effects. Can I boost the 13%/27%?
   

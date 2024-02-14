@@ -7,6 +7,8 @@ from util import periodic_logging, rd
 import numpy as np
 from collections import defaultdict, namedtuple, Counter
 from itertools import product
+import requests
+import re
 
 from Bio import SeqRecord
 from Bio.Data.CodonTable import standard_dna_table
@@ -234,3 +236,39 @@ def find_symmetry_length_scale(seq: Seq, k=1, start=2*10**6, span=2000):
     plt.legend()
 
     return
+
+
+def search_uniprotkb(query: str):
+    """Search the UniprotKb database. Useful for retrieving protein info."""
+    base_url = f'https://rest.uniprot.org/uniprotkb/search?query='
+    r = requests.get(base_url + query)
+    return r.json()['results']
+
+
+def get_protein_families(id: str):
+    """Get name of protein family, if any, from ensembl id."""
+    # Note: there is a sub-subfamily
+    pattern = r"'([^']*family[^']*)'"
+    query_results = search_uniprotkb(id)
+    substrings = re.findall(pattern, str(query_results))
+
+    superfamily, family, subfamily = '', '', ''
+    for substring in substrings:
+        if substring.startswith('Belongs to the'):
+            for subsubstring in substring[:15].split('.'):
+                if ind := subsubstring.find(' superfamily') != -1:
+                    superfamily = subsubstring[:ind]
+                elif ind := subsubstring.find(' subfamily') != -1:
+                    subfamily = subsubstring[:ind]
+                elif ind := subsubstring.find(' family') != -1:
+                    family = subsubstring[:ind]
+            break
+    else:
+        pass
+        """
+        Consider the stuff below
+        ** family member ** if no family assigned yet - before it is needed
+        family - (remove family) --> false positives
+        """
+
+    return superfamily, family, subfamily
