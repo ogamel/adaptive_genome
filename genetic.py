@@ -7,13 +7,13 @@ from util import periodic_logging, rd
 import numpy as np
 from collections import defaultdict, namedtuple, Counter
 from itertools import product
-import requests
-import re
 
 from Bio import SeqRecord
 from Bio.Data.CodonTable import standard_dna_table
 from Bio.Seq import Seq, reverse_complement, complement
 import matplotlib.pyplot as plt
+
+from protein import get_protein_families
 
 # Build codon forward and back tables. Standard_dna_table.back_table lacks stop codons. We use None to represent stop.
 # Standard_dna_table.back_table contains only one codon per protein. Here we build one with all synonymous codons.
@@ -29,8 +29,10 @@ NUCLEOTIDE_ALPHABET = standard_dna_table.nucleotide_alphabet
 RESIDUE_COL = 'residue'
 
 
-# summary of key feature properties
-FeatureBrief = namedtuple('FeatureBrief', ['seq_name', 'type', 'id', 'start', 'end', 'strand', 'phase', 'subfeatures'])
+# summary of key feature properties, and another for protein family information
+FeatureBrief = namedtuple('FeatureBrief', ['seq_name', 'type', 'id', 'start', 'end', 'strand', 'phase', 'subfeatures',
+                                           'prot_fam'])
+ProtFam = namedtuple('ProtFam', ['superfamily', 'family', 'subfamily'])
 
 
 def kmers_list(k, order='rc_complement'):
@@ -171,10 +173,13 @@ def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: lis
                     merged_phase = -1  # phase becomes meaningless
                     merged_strand = 0  # strand meaningless
 
+        # protein family info
+        superfamily, family, subfamily = get_protein_families(merged_id)
+        prot_fam = ProtFam(superfamily=superfamily, family=family, subfamily=subfamily)
         # final feature
         merged_feature = FeatureBrief(seq_name=seq_record.name, type=ft_type, id=merged_id, start=merged_start,
                                       end=merged_end, strand=merged_strand, phase=merged_phase,
-                                      subfeatures=merged_subfeatures)
+                                      subfeatures=merged_subfeatures, prot_fam=prot_fam)
         ft_merged_list.append(merged_feature)
 
         filtered_ct += len(ft_list)
@@ -236,39 +241,3 @@ def find_symmetry_length_scale(seq: Seq, k=1, start=2*10**6, span=2000):
     plt.legend()
 
     return
-
-
-def search_uniprotkb(query: str):
-    """Search the UniprotKb database. Useful for retrieving protein info."""
-    base_url = f'https://rest.uniprot.org/uniprotkb/search?query='
-    r = requests.get(base_url + query)
-    return r.json()['results']
-
-
-def get_protein_families(id: str):
-    """Get name of protein family, if any, from ensembl id."""
-    # Note: there is a sub-subfamily
-    pattern = r"'([^']*family[^']*)'"
-    query_results = search_uniprotkb(id)
-    substrings = re.findall(pattern, str(query_results))
-
-    superfamily, family, subfamily = '', '', ''
-    for substring in substrings:
-        if substring.startswith('Belongs to the'):
-            for subsubstring in substring[:15].split('.'):
-                if ind := subsubstring.find(' superfamily') != -1:
-                    superfamily = subsubstring[:ind]
-                elif ind := subsubstring.find(' subfamily') != -1:
-                    subfamily = subsubstring[:ind]
-                elif ind := subsubstring.find(' family') != -1:
-                    family = subsubstring[:ind]
-            break
-    else:
-        pass
-        """
-        Consider the stuff below
-        ** family member ** if no family assigned yet - before it is needed
-        family - (remove family) --> false positives
-        """
-
-    return superfamily, family, subfamily
