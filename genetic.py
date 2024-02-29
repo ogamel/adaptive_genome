@@ -31,8 +31,8 @@ RESIDUE_COL = 'residue'
 
 # summary of key feature properties, and another for protein family information
 FeatureBrief = namedtuple('FeatureBrief', ['seq_name', 'type', 'id', 'start', 'end', 'strand', 'phase', 'subfeatures',
-                                           'prot_fam'])
-ProtFam = namedtuple('ProtFam', ['superfamily', 'family', 'subfamily'])
+                                           'prot_fam'], defaults=(None,))
+ProtFam = namedtuple('ProtFam', ['superfamily', 'family', 'subfamily'], defaults=('','',''))
 
 
 def kmers_list(k, order='rc_complement'):
@@ -95,7 +95,7 @@ def code_frequency_proportions(backtable=CODON_BACK_TABLE):
     return {k: rd(v/v_sum) for k, v in freq_dict.items()}
 
 
-def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: list[str] = None,
+def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: list[str] = None, get_prot_fam: bool =True,
                        merge_overlapping_features: bool = True, merge_opposite_strands: bool = False) \
         -> list[FeatureBrief]:
     """
@@ -106,6 +106,17 @@ def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: lis
         if false keep them separate, despite the overlap. An analysis of Chr17 shows such cases are only 0.17% of the
         genome.
     """
+
+    def unique_protein_family(id):
+        """Take raw merged id, which may have many features, and return single ProtFam() object"""
+        families = sorted(list(set([get_protein_families(ft_id.split(':')[-1]) for ft_id in id.split()])))
+        if len(families) > 2 or (len(families) == 2 and families != ('', '', '')):
+            logging.info(f'Feature with interesting protein families: {families}')
+        # breakpoint()
+        if families:
+            superfamily, family, subfamily = families[-1]  # last unique family group, since first may be empty
+            return ProtFam(superfamily=superfamily, family=family, subfamily=subfamily)
+        return ProtFam()
 
     filtered_features_dict = defaultdict(list)
     # feature_indices = []
@@ -133,10 +144,8 @@ def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: lis
     # sort the features by start position
     for ft_type in filtered_features_dict.keys():
         filtered_features_dict[ft_type].sort(key=lambda x: x.start)
-    # filtered_features_dict = {ft_type: sorted(list(set(ft_list))) for ft_type, ft_list in filtered_features_dict.items()}
 
     # merge overlapping features on the same strand
-
     merged_features = []
     filtered_ct = 0
     for ft_type, ft_list in filtered_features_dict.items():
@@ -151,10 +160,13 @@ def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: lis
                 # 2. Features don't overlap.
                 # 3. Features overlap from opposite strands and merge_opposite_strands is False
 
+                # will not merge current with previous feature, so prepare the previous feature to be appended
+                prot_fam = unique_protein_family(merged_id) if get_prot_fam else ProtFam()  # protein family
                 merged_feature = FeatureBrief(seq_name=seq_record.name, type=ft_type, id=merged_id,
                                               start=merged_start, end=merged_end, strand=merged_strand,
-                                              phase=merged_phase, subfeatures=merged_subfeatures)
+                                              phase=merged_phase, subfeatures=merged_subfeatures, prot_fam=prot_fam)
                 ft_merged_list.append(merged_feature)  # append previous feature
+
                 # load current feature properties going forward
                 merged_start, merged_end, merged_subfeatures = ft.start, ft.end, ft.subfeatures
                 merged_strand, merged_phase, merged_id = ft.strand, ft.phase, ft.id
@@ -173,10 +185,8 @@ def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: lis
                     merged_phase = -1  # phase becomes meaningless
                     merged_strand = 0  # strand meaningless
 
-        # protein family info
-        superfamily, family, subfamily = get_protein_families(merged_id)
-        prot_fam = ProtFam(superfamily=superfamily, family=family, subfamily=subfamily)
         # final feature
+        prot_fam = unique_protein_family(merged_id) if get_prot_fam else ProtFam()  # protein family
         merged_feature = FeatureBrief(seq_name=seq_record.name, type=ft_type, id=merged_id, start=merged_start,
                                       end=merged_end, strand=merged_strand, phase=merged_phase,
                                       subfeatures=merged_subfeatures, prot_fam=prot_fam)
