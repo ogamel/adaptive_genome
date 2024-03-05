@@ -44,6 +44,12 @@ if __name__ == '__main__':
     # get the annotated sequence generator function, from the annotation GFF file
     seq_records_gen = read_annotation_generator(paths.annotation, seq_dict=seq_dict)
 
+    # feature brief experiment
+    feature_briefs_b = get_feature_briefs(next(seq_records_gen()), ['CDS'], merge_overlapping_features=True,
+                                          get_prot_fam=False)
+    feature_briefs = get_feature_briefs(next(seq_records_gen()), ['CDS'], merge_overlapping_features=True,
+                                        get_prot_fam=True)
+
     # get GERP retrieval function, from the BigWig file
     gerp_scorer = read_gerp_scorer(paths.gerp)
 

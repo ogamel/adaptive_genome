@@ -1,9 +1,14 @@
 """
 Functions related to protein sequences.
 """
-
+import logging
 import requests
 import re
+
+from collections import namedtuple
+
+ProtFam = namedtuple('ProtFam', ['superfamily', 'family', 'subfamily'], defaults=('','',''))
+
 
 def search_uniprotkb(query: str):
     """Search the UniprotKb database. Useful for retrieving protein info."""
@@ -27,7 +32,7 @@ def get_protein_families(id: str):
     substrings = get_protein_substrings(id)
 
     # TODO: consider using NLP to capture more general phrasing
-    #
+
     superfamily, family, subfamily = '', '', ''
     for substring in substrings:
         # substring = substring.lower()
@@ -49,3 +54,22 @@ def get_protein_families(id: str):
         """
 
     return superfamily, family, subfamily
+
+
+def unique_protein_family(id):
+    """Take raw merged id, which may have many features separated by space, and return a single ProtFam() object"""
+    families = sorted(list(set([get_protein_families(ft_id.split(':')[-1]) for ft_id in id.split()])))
+    # if len(families) > 2 or (len(families) == 2 and families[0] != ('', '', '')):
+
+    # log if families includes non-congruent triplets
+    for grp in zip(*families):
+        grp_set = set(grp)
+        grp_set.discard('')
+        if len(grp_set) > 1:  # more than one unique nonempty (super//sub)family, i.e. incongruent
+            logging.info(f'Feature with interesting protein families: {families}')
+
+    # breakpoint()
+    if families:
+        superfamily, family, subfamily = families[-1]  # last unique family group, since first may be empty
+        return ProtFam(superfamily=superfamily, family=family, subfamily=subfamily)
+    return ProtFam()

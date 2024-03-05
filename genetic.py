@@ -13,7 +13,7 @@ from Bio.Data.CodonTable import standard_dna_table
 from Bio.Seq import Seq, reverse_complement, complement
 import matplotlib.pyplot as plt
 
-from protein import get_protein_families
+from protein import unique_protein_family, ProtFam
 
 # Build codon forward and back tables. Standard_dna_table.back_table lacks stop codons. We use None to represent stop.
 # Standard_dna_table.back_table contains only one codon per protein. Here we build one with all synonymous codons.
@@ -32,7 +32,6 @@ RESIDUE_COL = 'residue'
 # summary of key feature properties, and another for protein family information
 FeatureBrief = namedtuple('FeatureBrief', ['seq_name', 'type', 'id', 'start', 'end', 'strand', 'phase', 'subfeatures',
                                            'prot_fam'], defaults=(None,))
-ProtFam = namedtuple('ProtFam', ['superfamily', 'family', 'subfamily'], defaults=('','',''))
 
 
 def kmers_list(k, order='rc_complement'):
@@ -106,17 +105,7 @@ def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: lis
         if false keep them separate, despite the overlap. An analysis of Chr17 shows such cases are only 0.17% of the
         genome.
     """
-
-    def unique_protein_family(id):
-        """Take raw merged id, which may have many features, and return single ProtFam() object"""
-        families = sorted(list(set([get_protein_families(ft_id.split(':')[-1]) for ft_id in id.split()])))
-        if len(families) > 2 or (len(families) == 2 and families != ('', '', '')):
-            logging.info(f'Feature with interesting protein families: {families}')
-        # breakpoint()
-        if families:
-            superfamily, family, subfamily = families[-1]  # last unique family group, since first may be empty
-            return ProtFam(superfamily=superfamily, family=family, subfamily=subfamily)
-        return ProtFam()
+    # TODO: add capability to save and reload extracted feature briefs - especially since uniprot queries are expensive
 
     filtered_features_dict = defaultdict(list)
     # feature_indices = []
