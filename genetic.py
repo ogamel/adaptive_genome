@@ -125,7 +125,7 @@ def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: lis
             feature_ct += 1
             phase = int(feature.qualifiers['phase'][0]) if 'phase' in feature.qualifiers else None
             filtered_feature = FeatureBrief(seq_name=seq_record.name, type=feature.type, id=feature.id,
-                                            start=feature.location.start.position, end=feature.location.end.position,
+                                            start=feature.location.start, end=feature.location.end,
                                             strand=feature.strand, phase=phase,
                                             subfeatures=len(feature.sub_features))
             filtered_features_dict[feature.type].append(filtered_feature)
