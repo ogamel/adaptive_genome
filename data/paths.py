@@ -21,6 +21,7 @@ from collections import namedtuple
 
 PROJ_PATH = '/Users/omar/Research/Adaptive Genome'
 FIGS_PATH = f'{PROJ_PATH}/figs'
+PROT_CACHE_PATH = f'{PROJ_PATH}/data/cache/prot_cache.pkl'
 
 ProjectPaths = namedtuple('ProjectPaths', ['sequence', 'annotation', 'gerp'])
 

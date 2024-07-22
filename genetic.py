@@ -13,7 +13,7 @@ from Bio.Data.CodonTable import standard_dna_table
 from Bio.Seq import Seq, reverse_complement, complement
 import matplotlib.pyplot as plt
 
-from protein import unique_protein_family, ProtFam
+from protein import unique_protein_family, ProtFam, prot_cache
 
 # Build codon forward and back tables. Standard_dna_table.back_table lacks stop codons. We use None to represent stop.
 # Standard_dna_table.back_table contains only one codon per protein. Here we build one with all synonymous codons.
@@ -105,7 +105,6 @@ def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: lis
         if false keep them separate, despite the overlap. An analysis of Chr17 shows such cases are only 0.17% of the
         genome.
     """
-    # TODO: add capability to save and reload extracted feature briefs - especially since uniprot queries are expensive
 
     filtered_features_dict = defaultdict(list)
     # feature_indices = []
@@ -126,7 +125,7 @@ def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: lis
             phase = int(feature.qualifiers['phase'][0]) if 'phase' in feature.qualifiers else None
             filtered_feature = FeatureBrief(seq_name=seq_record.name, type=feature.type, id=feature.id,
                                             start=feature.location.start, end=feature.location.end,
-                                            strand=feature.strand, phase=phase,
+                                            strand=feature.location.strand, phase=phase,
                                             subfeatures=len(feature.sub_features))
             filtered_features_dict[feature.type].append(filtered_feature)
 
@@ -183,6 +182,8 @@ def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: lis
 
         filtered_ct += len(ft_list)
         merged_features.extend(ft_merged_list)
+
+        prot_cache.save()  # save protein cache to .pkl
 
     logging.info(f'Traversed feature tree in {iter_ct:,} iterations. \n\t\tExtracted {filtered_ct:,} unique features.'
                  f'\n\t\tMerged to {len(merged_features):,} non-overlapping features.')

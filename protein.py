@@ -1,13 +1,54 @@
 """
 Functions related to protein sequences.
 """
+import os
 import logging
 import requests
 import re
+import pickle
 
 from collections import namedtuple
+from data.paths import PROT_CACHE_PATH
 
 ProtFam = namedtuple('ProtFam', ['superfamily', 'family', 'subfamily'], defaults=('','',''))
+
+
+class ProteinCache:
+    def __init__(self, path=PROT_CACHE_PATH, max_size=None, clean_slate=False):
+        self.path = path
+        self.max_size = max_size  # TODO: implement LRU
+
+        if os.path.exists(path) and os.path.getsize(path) > 0 and not clean_slate:
+            with open(path, 'rb') as f:
+                self._cache = pickle.load(f)
+        else:
+            self._cache = {}
+
+    def __contains__(self, item):
+        return item in self._cache
+
+    def __delitem__(self, key):
+        del self._cache[key]
+
+    def __getitem__(self, item):
+        return self._cache[item]
+
+    def __len__(self):
+        return len(self._cache)
+
+    def __setitem__(self, key, value):
+        self._cache[key] = value
+
+    def clear_cache(self):
+        self._cache = {}
+
+    def save(self, path=None):
+        path = path or self.path
+        if path is None:
+            raise ValueError("cache path must be given")
+        with open(path, 'wb') as f:
+            pickle.dump(self._cache, f)
+        return
 
 
 def search_uniprotkb(query: str):
@@ -25,8 +66,11 @@ def get_protein_substrings(id: str):
     return re.findall(pattern, str(query_results))
 
 
+prot_cache = ProteinCache()
 def get_protein_families(id: str):
     """Get name of protein family, if any, from ensembl id."""
+    if id in prot_cache:
+        return prot_cache[id]
     # Note: there is a sub-subfamily
     PREAMBLE = 'Belongs to the '
     substrings = get_protein_substrings(id)
@@ -53,7 +97,8 @@ def get_protein_families(id: str):
         family - (remove family) --> false positives
         """
 
-    return superfamily, family, subfamily
+    prot_cache[id] = superfamily, family, subfamily
+    return prot_cache[id]
 
 
 def unique_protein_family(id):

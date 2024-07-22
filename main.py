@@ -19,6 +19,7 @@ from score_nn_modeling import LocalWindowModel, ModelTrainer
 from score_analysis import mutual_information_by_dilation, corrcoefs_by_score_count, diff_stats_by_score_count
 from visuals import plot_mutual_information_by_dilation, plot_mutual_information_by_dilation_by_kmer
 from genetic import get_feature_briefs, CODON_FORWARD_TABLE
+from protein import ProtFam
 
 # from importlib import reload
 # score_analysis = reload(score_analysis)
