@@ -70,10 +70,13 @@ prot_cache = ProteinCache()
 def get_protein_families(id: str):
     """Get name of protein family, if any, from ensembl id."""
     if id in prot_cache:
+    # if id in prot_cache and not (')' in prot_cache[id][1] or '(' in prot_cache[id][1]):
         return prot_cache[id]
     # Note: there is a sub-subfamily
     PREAMBLE = 'Belongs to the '
     substrings = get_protein_substrings(id)
+
+    # superfamily, family, subfamily = prot_cache[id]
 
     # TODO: consider using NLP to capture more general phrasing
 
@@ -81,7 +84,7 @@ def get_protein_families(id: str):
     for substring in substrings:
         # substring = substring.lower()
         if substring.startswith(PREAMBLE):
-            for subsubstring in substring[len(PREAMBLE):].split('.'):
+            for subsubstring in substring[len(PREAMBLE):].split('. '):
                 if (ind := subsubstring.find(' superfamily')) != -1:
                     superfamily = subsubstring[:ind]
                 elif (ind := subsubstring.find(' subfamily')) != -1:
@@ -98,6 +101,7 @@ def get_protein_families(id: str):
         """
 
     prot_cache[id] = superfamily, family, subfamily
+    print("contains brackets. id: ", id, "fam:", family, "sub str:", substrings)
     return prot_cache[id]
 
 

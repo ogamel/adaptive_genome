@@ -59,6 +59,9 @@ For each kmer, first two codon positions have positive GERP, i.e. don't vary muc
 
 As for k-mer counts, basically just frame is complementable. Strand doesn't seem to be. phase no, ft_len no. 
 
+    So we can further refine extended Chargaff's rule by frame, for coding regions
+q: What about noncoding? there is no frame there. So what does this mean then?
+
 
 #### Differential analysis
 Diff analysis results make sense. The differences between candidate complements are very small. They are calculated
@@ -104,7 +107,7 @@ the probability is slightly higher is negative strand while score is higher in p
 
 ### Genetic Code
 Delve into genetic code, whether the symmetries above can shed light on its properties.
-- Found interesting graph between amino acids were edges are reverse complement codons. Get two disconnected graphs, 
+- Found interesting graph between amino acids where edges are reverse complement codons. Get two disconnected graphs, 
 size 7 and 14. The larger can itself is two graphs sizes 8 and 5 connected only by stop codon.
 - But what does that even mean? RC the codon only makes sense if both strands are transcribed. actually no, two 
 connected amino acids can mean they have common reverse codons 
@@ -137,7 +140,12 @@ I did analysis on "artificial genome", creating some random genetic code and rev
 doing K-mer analysis. As expected, there is no pattern. 2-mers independent of frame - makes sense, because the frame
 for k=2 is out of sync with the 3-mer pattern, and will average out to the same.
 for k=3 however, as expected, the count is heavily dependent on the frame, with 10 fold variation normal, and even
-200 fold occuring once. 
+200 fold occurring once.
+
+    Such massive change doesn't happen in actual genetic code, and genome. Rather it is minor change between frames.
+
+Todo: check variation in count / score between frames, as compared to a random code and text. 
+Is it optimized in this sense? How so?
 
 ### Misc
 - Standard error of GERP is tiny, and standard dev is quite large and doesn't change much, somewhat useless
@@ -149,7 +157,7 @@ same strand have same score mean.
 the score standard deviations artificially small. Probably because my std combination formula assumes independence, 
 which is clearly incorrect - how to resolve? By taking into account dependence, explicitly .... or by construction 
 calculating the std for every possible aggregation? But is this right? they are supposed to be independent actually 
-- Read GERP Paper
+- Read GERP Paper - done
 - 
 
 ## Paths Forward
@@ -165,12 +173,13 @@ depend on how codons are used together.
   - for all codons, and translate them... 64 x 4 matrix ... since only 4 codons could follow another
   - [Frameshift and wild-type proteins are often highly similar because the genetic code and genomes were optimized for 
      frameshift tolerance](https://bmcgenomics.biomedcentral.com/articles/10.1186/s12864-022-08435-6)
+  - compare the observed values of said matrix with theoretical ones, for random, and what else?
 - Seems rarer codons are more variable between species ... find interpretation and meaning of this
   between other codons, any other pattern? scatterplot frequency vs gerp score.
 
 ### Theory
 - What does reverse complement equality imply about the genetic code and the allowed sequences of 
-amino acids? Given some frame-wise frequency, what does this impose on the aforementioned? This is profound. Compare it
+amino acids? Given (similar?) frame-wise frequency, what does this impose on the aforementioned? This is profound. Compare it
 to artificial genome.
 - Perhaps non standard genetic code is reflected in the sequences themselves. That code and sequences have to go together 
 to conserve these higher properties.
@@ -187,9 +196,15 @@ to conserve these higher properties.
 pronouns, subject, object .... in the genome we just have k-mer, codon, and annotation .... need to find intermediate 
 concepts in the literature, and discover some myself ...fundamentally a data analysis problem.
 
+### Protein families
+- Check GERP score between families - does it change drastically between them? Even when stratified by codons?
+- Is it closer between subfamilies (find hierarchies with common levels) - write code for it
+- Where I have "subunit" information, are the GERP results consistent with function of subunit
+- Families with common description e.g. "transporter", common name only differ in number TMEM##
+
 ### Data expansion
 - Whole human genome
-- Mitochondria (since it apparently may not obey chargaff's)
+- Mitochondria (since it apparently may not obey chargaff's - but is that only due to smaller size?)
 - Analyze Camel DNA افلا ينظرون الى الابل كيف خلقت https://ftp.ensembl.org/pub/current_fasta/camelus_dromedarius/dna/
 
 ### New projects
