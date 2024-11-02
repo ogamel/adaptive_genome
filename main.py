@@ -11,14 +11,14 @@ import score_collation
 import pandas as pd
 
 from data.load import read_sequence, read_annotation_generator, read_gerp_scorer
-from data.paths import chr17_paths  # paths to source data files
+from data.paths import chr17_paths, wgs_paths  # paths to source data files
 from data.process import get_train_test_x_y
 from score_collation import score_stats_by_kmer, score_stats_by_dilated_kmer, sample_extreme_score_sequences, \
     aggregate_over_additive_field, score_stats_by_feature_type, aggregate_over_position, STRAND_COL
 from score_nn_modeling import LocalWindowModel, ModelTrainer
 from score_analysis import mutual_information_by_dilation, corrcoefs_by_score_count, diff_stats_by_score_count
 from visuals import plot_mutual_information_by_dilation, plot_mutual_information_by_dilation_by_kmer
-from genetic import get_feature_briefs, CODON_FORWARD_TABLE
+from genetic import get_feature_briefs, CODON_FORWARD_TABLE, MAIN_SEQ_NAMES
 from protein import ProtFam
 
 # from importlib import reload
@@ -34,7 +34,8 @@ pd.options.mode.chained_assignment = None  # default='warn'
 
 if __name__ == '__main__':
     # start the analysis with human chromosome 17
-    paths = chr17_paths
+    # paths = chr17_paths
+    paths = wgs_paths
 
     # get the raw sequence dictionary, from a FASTA file
     seq_dict = read_sequence(paths.sequence)
@@ -46,10 +47,10 @@ if __name__ == '__main__':
     seq_records_gen = read_annotation_generator(paths.annotation, seq_dict=seq_dict)
 
     # feature brief experiment
-    feature_briefs_b = get_feature_briefs(next(seq_records_gen()), ['CDS'], merge_overlapping_features=True,
-                                          get_prot_fam=False)
-    feature_briefs = get_feature_briefs(next(seq_records_gen()), ['CDS'], merge_overlapping_features=True,
-                                        get_prot_fam=True)
+    # feature_briefs = get_feature_briefs(next(seq_records_gen()), ['CDS'], merge_overlapping_features=True,
+    #                                       get_prot_fam=False)
+    # feature_briefs = get_feature_briefs(next(seq_records_gen()), ['CDS'], merge_overlapping_features=True,
+    #                                     get_prot_fam=True)
 
     # get GERP retrieval function, from the BigWig file
     gerp_scorer = read_gerp_scorer(paths.gerp)
@@ -64,6 +65,33 @@ if __name__ == '__main__':
     # kmer_base_df = score_stats_by_kmer(seq_records_gen, gerp_scorer, ['five_prime_UTR'], k_values=[1,2,3])
 
     _ = corrcoefs_by_score_count(kmer_base_df)
+    _ = diff_stats_by_score_count(kmer_base_df)
+
+    from importlib import reload
+    score_analysis = reload(score_analysis)
+    from score_analysis import mutual_information_by_dilation, corrcoefs_by_score_count, diff_stats_by_score_count
+    stats = {seq_name: {} for seq_name in MAIN_SEQ_NAMES}
+    for seq_name in MAIN_SEQ_NAMES:
+        stats[seq_name]['many_cols'] = {}
+
+        df_seq = kmer_base_df[kmer_base_df.seq_name == seq_name]
+        print(f'\n\nScore correlations for {seq_name}')
+        stats[seq_name]['many_cols']['corr'] = corrcoefs_by_score_count(df_seq)
+        stats[seq_name]['many_cols']['diff'] = diff_stats_by_score_count(df_seq)
+
+    for seq_name in MAIN_SEQ_NAMES:
+        stats[seq_name]['few_cols'] = {}
+
+        print(f'\n\nCount correlations for {seq_name}')
+        df_seq = kmer_base_df[kmer_base_df.seq_name == seq_name]
+        df_seq0 = aggregate_over_additive_field(df_seq, STRAND_COL)
+        stats[seq_name]['few_cols']['corr'] = corrcoefs_by_score_count(df_seq0)
+        stats[seq_name]['few_cols']['diff'] = diff_stats_by_score_count(df_seq0)
+
+    df_filter = kmer_base_df[~kmer_base_df.seq_name.isin(['19','Y'])]
+    _ = diff_stats_by_score_count(df_filter)
+
+
     _ = diff_stats_by_score_count(kmer_base_df)
 
     # without strand - we find count correlates here

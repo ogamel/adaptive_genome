@@ -5,6 +5,7 @@ Module to analyse the scores output by score_collation.py.
 import numpy as np
 import pandas as pd
 from Bio.Seq import reverse_complement
+from util import rd
 
 from genetic import kmers_list
 from typing import Iterator, Callable, Iterable, Optional, Tuple
@@ -26,6 +27,8 @@ def corrcoefs_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, coun
     # and the later to the second. We then take the correlation across the two sets.
     # Nonetheless, the idea is to measure the differences within pairs, and show they are very small relative to
     # the variation of the whole set. Pairwise correlation achieves this.
+
+    out_dict = {}
 
     if k_values is None:
         k_values = df_in[K_COL].unique()
@@ -86,7 +89,13 @@ def corrcoefs_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, coun
               f'\n\t\tk-mer counts {corr_pairwise_count:0.3f},'
               f'\n\t\tk-mer scores {corr_pairwise_score:0.3f}.')
 
-    return  # corr_count_score, corr_pairwise_count, corr_pairwise_score
+        out_dict[k] = {
+                        'count_score_corr': rd(corr_count_score),
+                        'corr_pairwise_count': rd(corr_pairwise_count),
+                        'corr_pairwise_score': rd(corr_pairwise_score)
+                       }
+
+    return out_dict
 
 
 def diff_stats_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, count_col: str = COUNT_COL,
@@ -101,6 +110,8 @@ def diff_stats_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, cou
 
     COUNT_DIFF = 'ct_d'
     SCORE_DIFF = 'sc_d'
+
+    out_dict = {}
 
     if k_values is None:
         k_values = df_in[K_COL].unique()
@@ -120,6 +131,7 @@ def diff_stats_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, cou
     rc_sort_ascending = [False if col in [POS_COL, STRAND_COL] else True for col in sortby_cols]
 
     for k in k_values:
+        k = int(k)
         df_k = df[df[K_COL] == k]
 
         kmers_set = set(kmers_list(k))
@@ -174,20 +186,34 @@ def diff_stats_by_score_count(df_in: pd.DataFrame, kmer_col: str = KMER_COL, cou
         count_std_k = np.std(df_k[count_col])
         score_std_k = np.std(df_k[score_col])
 
+        rmsd_count = rd(np.sqrt((df_k[COUNT_DIFF] ** 2).mean()) / (2 * count_std_k))
+        rmsd_score = rd(np.sqrt((df_k[SCORE_DIFF] ** 2).mean()) / (2 * score_std_k))
+
         # equivalent to mean square difference / 2, where difference is measure in units of std. dev.
         print(f'\nk = {k}. Root mean square difference (normalized by twice the overall std. dev.) between pairs '
               f'complementary in columns:'
               f'\n\t\t{", ".join(complemented_cols)}'
-              f'\n\t\t\tCounts: {np.sqrt((df_k[COUNT_DIFF]**2).mean())/(2 * count_std_k):.4f}. '
-              f'Score: {np.sqrt((df_k[SCORE_DIFF]**2).mean())/(2 * score_std_k):.4f}.')
+              f'\n\t\t\tCounts: {rmsd_count:.4f}. '
+              f'Score: {rmsd_score:.4f}.')
 
+        out_dict[k] = {
+                        'cols': tuple(sorted(complemented_cols)),
+                        'rmsd': {'rmsd_count': rmsd_count, 'rmsd_score': rmsd_score}
+                      }
 
+        inv_cols_dict = {}
         for inverted_col in complemented_cols:
-            print(f'\t\t above except for {inverted_col}'
-                  f'\n\t\t\tCounts: {np.sqrt((df_k[COUNT_DIFF + "_" + inverted_col]**2).mean())/(2 * count_std_k):.4f}. '
-                  f'Score: {np.sqrt((df_k[SCORE_DIFF + "_" + inverted_col]**2).mean())/(2 * score_std_k):.4f}.')
+            rmsd_inv_count = rd(np.sqrt((df_k[COUNT_DIFF + "_" + inverted_col]**2).mean())/(2 * count_std_k))
+            rmsd_inv_score = rd(np.sqrt((df_k[SCORE_DIFF + "_" + inverted_col]**2).mean())/(2 * score_std_k))
+            print(f'\t\t above except for inverted {inverted_col}'
+                  f'\n\t\t\tCounts: {rmsd_inv_count:.4f}. '
+                  f'Score: {rmsd_inv_score:.4f}.')
 
-    return df
+            inv_cols_dict[inverted_col] = {'rmsd_inv_count': rmsd_inv_count, 'rmsd_inv_score': rmsd_inv_score}
+
+        out_dict[k]['inverted_cols'] = inv_cols_dict
+
+    return out_dict
 
 
 def mutual_information_by_dilation(df_in: pd.DataFrame, do_triple:bool = False) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -318,3 +344,26 @@ def mutual_information_by_dilation(df_in: pd.DataFrame, do_triple:bool = False) 
 # TODO: check amino acid network ... i.e. reverse complement leads to another AA? but that is on opposite strand.
 #  May be look at sum of frequency of all codons that make same AA. actually, does RC imply anything about relative
 #  frequency of AA? I don't think anything simple
+
+from util import periodic_logging
+from collections import defaultdict
+def score_by_protein_family(feature_briefs, scorer):
+    """Get average GERP for each feature, group them by protein family"""
+    # scorer: function that takes seqname, start and end, returning score values for specified subsequence.
+
+    # TODO: refactor and relocate this rough function
+
+    output = defaultdict(list)
+    for i, ft in enumerate(feature_briefs):
+        periodic_logging(i, f'Processing feature {i:,}.', v=len(feature_briefs) // 10)
+        scores = scorer(ft.seq_name, ft.start, ft.end)
+        output[ft.prot_fam].append(np.nanmean(scores))
+
+    final = {}
+    for k, v in output.items():
+        final[k] = (rd(np.nanmean(v)), rd(np.std(v)), len(v))
+
+    return final
+
+
+

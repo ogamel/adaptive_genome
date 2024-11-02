@@ -28,6 +28,8 @@ CODON_BACK_TABLE = dict(CODON_BACK_TABLE)
 NUCLEOTIDE_ALPHABET = standard_dna_table.nucleotide_alphabet
 RESIDUE_COL = 'residue'
 
+MAIN_SEQ_NAMES = [str(i) for i in range(1, 23)]+['X', 'Y']
+
 
 # summary of key feature properties, and another for protein family information
 FeatureBrief = namedtuple('FeatureBrief', ['seq_name', 'type', 'id', 'start', 'end', 'strand', 'phase', 'subfeatures',
@@ -94,7 +96,7 @@ def code_frequency_proportions(backtable=CODON_BACK_TABLE):
     return {k: rd(v/v_sum) for k, v in freq_dict.items()}
 
 
-def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: list[str] = None, get_prot_fam: bool =True,
+def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: list[str] = None, get_prot_fam: bool = False,
                        merge_overlapping_features: bool = True, merge_opposite_strands: bool = False) \
         -> list[FeatureBrief]:
     """
@@ -106,6 +108,7 @@ def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: lis
         genome.
     """
 
+    # print(f'get_prot_fam {get_prot_fam}')
     filtered_features_dict = defaultdict(list)
     # feature_indices = []
     iter_ct, feature_ct = 0, 0
@@ -131,7 +134,7 @@ def get_feature_briefs(seq_record: SeqRecord.SeqRecord, feature_type_filter: lis
 
     # sort the features by start position
     for ft_type in filtered_features_dict.keys():
-        filtered_features_dict[ft_type].sort(key=lambda x: x.start)
+        filtered_features_dict[ft_type].sort(key=lambda x: (x.seq_name, x.start))
 
     # merge overlapping features on the same strand
     merged_features = []

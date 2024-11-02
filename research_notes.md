@@ -30,7 +30,7 @@ ENSP00000471646 ENSP00000482950 ENSP00000513293 ENSP00000319210 ENSP00000479485 
 [Chargaff's Second rule]https://en.wikipedia.org/wiki/Chargaff%27s_rules)
 Already known for frequencies, perhaps my finding can be to extend it to GERP, and find exceptions... 
  - what can be concluded from this, is it that Chargaff's rule has to do with variation, i.e. this is a novel finding. 
-or is this just a trivial consequence? too sleep deprived to tell.
+or is this just a trivial consequence? too sleep-deprived to tell.
    - Turns out neither. GERP uncorrelated with frequency. But the inversion symmetry of neither is trivial.
  In literature no relation known between Chargaff's and genetic code ... perhaps I should find one .... would be amazing, 
  إن شاء الله... اللهم افتح علينا
@@ -52,15 +52,17 @@ What does this mean? The above implies kmer is same as itself on either strand, 
 Could this all somehow be trivial? No. It shows GERP (variation) is largely a function of kmer. 
 How much? For k=3, std. dev. of all the means across (kmer, strand, frame, pos) tuples is about 1.275, while mean std. 
 dev. within a single tuple is 2.4. So a good explanation, but most variation is still within a given tuple.
-(TODO: Verify this)
+(TODO: Verify this: done with XGBoost)
 
 For each kmer, first two codon positions have positive GERP, i.e. don't vary much, and the final one 
 (or first in -1 strand) varies a lot with very negative GERP.
 
 As for k-mer counts, basically just frame is complementable. Strand doesn't seem to be. phase no, ft_len no. 
 
-    So we can further refine extended Chargaff's rule by frame, for coding regions
+    So we can further refine extended Chargaff's rule by frame, for coding regions.
+
 q: What about noncoding? there is no frame there. So what does this mean then?
+
 
 
 #### Differential analysis
@@ -74,9 +76,19 @@ Note: I started with  mean absolute difference - whose expected value randomly i
 ([ref](https://stats.stackexchange.com/questions/489075/what-is-the-mean-absolute-difference-between-values-in-a-normal-distribution)),
 then switched to mean square difference, which is easier to relate to variance and std. dev.
 
+Trying with entire genome, the differential analysis differs by genome. Chromosomes 19 and Y both do poorly on 
+differential analysis, where the discovered pattern is weaker, though still much better than mixing up the features.
+Chr_Y has very few CDS (86 vs the rest 3K-20K) so we can ignore it. Chr_19 has 12K CDS, but -0.317 score_mean vs 
+the rest 0.333-0.768, It rms diff is 0.15, much higher than otherwise avg 0.05. Chr 20 also has 0.11 rms diff. Lowest is
+<0.02 rms diff
+Why would some chromosomes differ if it is essential to the variation mechanism?
+
+
+
+
 #### Non-CDS features
 Try outside CDS.
-- lnc_RNA: frame doesn't matter, because it is ill defined from the beginning of the feature
+- lnc_RNA: frame doesn't matter, because it is ill-defined from the beginning of the feature
     - even strand doesn't matter as much as it did before ... ... but then may be I need to redefine frame here?
     - to some absolute? - ft_start doesn't matter. Frame here not relevant
     - score: position and strand. count: position 
@@ -147,6 +159,11 @@ for k=3 however, as expected, the count is heavily dependent on the frame, with 
 Todo: check variation in count / score between frames, as compared to a random code and text. 
 Is it optimized in this sense? How so?
 
+### Protein Families
+- Tyr protein kinase - receptor vs  Tyr protein kinase (presumably non receptor). the former  is more conserved. seems 
+sensible, since it has extra receptor-like features an extracellular ligand-binding domain and a transmembrane-spanning 
+region - keep looking
+
 ### Misc
 - Standard error of GERP is tiny, and standard dev is quite large and doesn't change much, somewhat useless
   - It gets smaller with further breakdown  
@@ -174,17 +191,23 @@ depend on how codons are used together.
   - [Frameshift and wild-type proteins are often highly similar because the genetic code and genomes were optimized for 
      frameshift tolerance](https://bmcgenomics.biomedcentral.com/articles/10.1186/s12864-022-08435-6)
   - compare the observed values of said matrix with theoretical ones, for random, and what else?
+  - compare sequence of amino acids in each frame
 - Seems rarer codons are more variable between species ... find interpretation and meaning of this
   between other codons, any other pattern? scatterplot frequency vs gerp score.
 
 ### Theory
 - What does reverse complement equality imply about the genetic code and the allowed sequences of 
 amino acids? Given (similar?) frame-wise frequency, what does this impose on the aforementioned? This is profound. Compare it
-to artificial genome.
+to artificial genome. 
+    - not much because it is reverse complement with the strand as well. So always the coding strand
 - Perhaps non standard genetic code is reflected in the sequences themselves. That code and sequences have to go together 
 to conserve these higher properties.
 - Find nice symmetric order of rc pairs - rather than currently used canonical ordering
 - Whatever properties one explores for genetic code, they could also apply for alternate genetic code - check there
+  - Ways in which genetic code varies ... what is allowed? 
+  - What is the best visual representation that shows how code can be varied and parametrized?
+  - Does such parametrization vary with prevalence and arrangement of codons in actual sequences?
+  - 
 
 ### Motif language analog
 - Motifs vs GERP score https://en.wikipedia.org/wiki/Sequence_motif (seems I need more detailed annotation)
@@ -201,6 +224,7 @@ concepts in the literature, and discover some myself ...fundamentally a data ana
 - Is it closer between subfamilies (find hierarchies with common levels) - write code for it
 - Where I have "subunit" information, are the GERP results consistent with function of subunit
 - Families with common description e.g. "transporter", common name only differ in number TMEM##
+- If I add protein family info as another feature, can I better predict GERP?
 
 ### Data expansion
 - Whole human genome

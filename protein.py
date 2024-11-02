@@ -86,11 +86,11 @@ def get_protein_families(id: str):
         if substring.startswith(PREAMBLE):
             for subsubstring in substring[len(PREAMBLE):].split('. '):
                 if (ind := subsubstring.find(' superfamily')) != -1:
-                    superfamily = subsubstring[:ind]
+                    superfamily = subsubstring[:ind].strip()
                 elif (ind := subsubstring.find(' subfamily')) != -1:
-                    subfamily = subsubstring[:ind]
+                    subfamily = subsubstring[:ind].strip()
                 elif (ind := subsubstring.find(' family')) != -1:
-                    family = subsubstring[:ind]
+                    family = subsubstring[:ind].strip()
             break
     else:
         pass
@@ -101,7 +101,7 @@ def get_protein_families(id: str):
         """
 
     prot_cache[id] = superfamily, family, subfamily
-    print("contains brackets. id: ", id, "fam:", family, "sub str:", substrings)
+    # print("contains brackets. id: ", id, "fam:", family, "sub str:", substrings)
     return prot_cache[id]
 
 

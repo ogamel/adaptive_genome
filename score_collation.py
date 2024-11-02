@@ -12,7 +12,7 @@ import pandas as pd
 from Bio.SeqRecord import SeqRecord
 from Bio.Data.CodonTable import standard_dna_table
 
-from genetic import get_feature_briefs
+from genetic import get_feature_briefs, MAIN_SEQ_NAMES
 from util import periodic_logging, rd, std_to_std_of_mean, std_to_std_of_sum
 
 ID_COLS = ['k', 'kmer', 'seq_name', 'strand', 'frame', 'pos']
@@ -29,7 +29,7 @@ NUCLEOTIDES = set(standard_dna_table.nucleotide_alphabet)
 
 
 def score_stats_by_feature_type(seq_records_gen: Callable[[], Iterator[SeqRecord]],
-                                scorer: Callable[[str, int, int], list[float]]) -> pd.DataFrame:
+                                scorer: Callable[[str, int, int], list[float]], skip_minor_seq=True) -> pd.DataFrame:
     """
     Do basic analysis of score statistics by feature type, for a passed in score function.
     """
@@ -43,6 +43,8 @@ def score_stats_by_feature_type(seq_records_gen: Callable[[], Iterator[SeqRecord
     feature_data_rows = []
     for seq_record in seq_records:
         seq_name = seq_record.name
+        if skip_minor_seq and seq_name not in MAIN_SEQ_NAMES:
+            continue
         logging.info(f'Sequence {seq_name} ...')
 
         feature_briefs = get_feature_briefs(seq_record)
@@ -85,7 +87,7 @@ def score_stats_by_feature_type(seq_records_gen: Callable[[], Iterator[SeqRecord
 
 def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
                         scorer: Callable[[str, int, int], np.array],  feature_type_filter: list[str],
-                        k_values: Iterable[int] = (2,)) -> pd.DataFrame:
+                        k_values: Iterable[int] = (2,), get_prot_fam=False, skip_minor_seq=True) -> pd.DataFrame:
     """
     Do basic analysis of score statistics by k-mer, only on sequences annotated by a feature type in feature_type_filter.
     score: function that takes seqname, start and end, returning score values for specified subsequence.
@@ -96,9 +98,12 @@ def score_stats_by_kmer(seq_records_gen: Callable[[], Iterator[SeqRecord]],
     kmer_data = defaultdict(lambda: np.zeros(3))  # count, sum, sum of squares
     for seq_record in seq_records:
         seq_name = seq_record.name
+        if skip_minor_seq and seq_name not in MAIN_SEQ_NAMES:
+            continue
         logging.info(f'Sequence {seq_name} ...')
 
-        feature_briefs = get_feature_briefs(seq_record, feature_type_filter, merge_overlapping_features=True)
+        feature_briefs = get_feature_briefs(seq_record, feature_type_filter, merge_overlapping_features=True,
+                                            get_prot_fam=get_prot_fam)
         for i, ft in enumerate(feature_briefs):
             periodic_logging(i, f'Processing feature {i:,}.', v=len(feature_briefs)//10)
 

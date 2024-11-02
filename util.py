@@ -15,6 +15,7 @@ ROUND_DECIMALS = 3
 def periodic_logging(n, msg=None, v=25000):
     """Log number message if n is divisible by v. Default msg value is n."""
     # TODO: overwrite previous info line, and lower default v.
+    v = max(v, 1)
     if not msg:
         msg = n
     if n % v == 0:
@@ -24,7 +25,7 @@ def periodic_logging(n, msg=None, v=25000):
 
 def rd(n, d=ROUND_DECIMALS):
     """Round n to the nearest d decimal points."""
-    return np.round(n, d)
+    return np.round(n, d).item()
 
 
 def std_to_std_of_mean(std_array, weights=None):
